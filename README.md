@@ -1,4 +1,8 @@
-# 🤖 Sistema RAG con FAISS y LLMs
+**![GitHub release](https://img.shields.io/github/v/release/C4R105-AP/Sistema-RAG-Demo)
+![Platform](https://img.shields.io/badge/platform-Windows-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+**# 🤖 Sistema RAG con FAISS y LLMs
 
 Sistema de Recuperación Aumentada por Generación (RAG) que permite hacer preguntas sobre documentos técnicos utilizando embeddings vectoriales y modelos de lenguaje.
 
