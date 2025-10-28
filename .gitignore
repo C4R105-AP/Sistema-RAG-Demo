@@ -1,0 +1,119 @@
+# ============================================
+# PROTECCIÓN DE CREDENCIALES Y DATOS SENSIBLES
+# ============================================
+
+# API Keys y configuración sensible
+.env
+*.env
+.env.local
+config.bat
+*.key
+claveopenai.txt
+*clave*.txt
+*key*.txt
+
+# Archivos de configuración con credenciales
+*_config.py
+secrets.json
+
+# ============================================
+# PYTHON
+# ============================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# PyInstaller
+*.manifest
+*.spec
+build/
+dist/
+*.exe
+compilar.bat
+launcher.py
+
+# Ejecutable portable (solo para Releases)
+Sistema_RAG_Portable/
+Sistema_RAG_Portable.zip
+
+# ============================================
+# DATOS Y ARCHIVOS TEMPORALES
+# ============================================
+
+# Documentos subidos (opcional - descomenta si no quieres subir PDFs)
+# uploaded_docs/*.pdf
+
+# Vectorstores (son grandes y se pueden regenerar)
+vectorstore_faiss/
+vectorstore_*/
+
+# Cache
+*.pyc
+*.pyo
+*.pyd
+.cache/
+*.log
+
+# ============================================
+# IDEs y EDITORES
+# ============================================
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# ============================================
+# SISTEMA OPERATIVO
+# ============================================
+
+# Windows
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+*~
+.directory
+
+# ============================================
+# OTROS
+# ============================================
+
+# Logs
+*.log
+logs/
+
+# Temporales
+temp/
+tmp/
+*.tmp
+*.bak
+*.swp
+
+# Compilación
+*.o
+*.obj
+
