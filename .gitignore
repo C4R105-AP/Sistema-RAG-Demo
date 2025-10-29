@@ -1,4 +1,25 @@
 # ============================================
+# CÓDIGO FUENTE (NO SUBIR - SOLO EJECUTABLE EN RELEASES)
+# ============================================
+
+# Todo el código fuente Python
+*.py
+api_rag.py
+cliente_rag.py
+
+# Archivos web
+*.html
+interfaz_web.html
+
+# Dependencias y configuración
+requirements.txt
+*.txt
+!LICENSE
+
+# Documentos (incluidos en el ejecutable)
+uploaded_docs/
+
+# ============================================
 # PROTECCIÓN DE CREDENCIALES Y DATOS SENSIBLES
 # ============================================
 
