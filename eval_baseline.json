@@ -1,0 +1,154 @@
+{
+  "timestamp": "2026-06-16T12:47:53.358818+00:00",
+  "config": {
+    "CHUNK_SIZE": 900,
+    "CHUNK_OVERLAP": 200,
+    "CHUNK_SIZE_env": "900",
+    "CHUNK_OVERLAP_env": null,
+    "DEFAULT_K": 8,
+    "total_chunks": 182,
+    "bm25_chunks": 182,
+    "sincronizado": true
+  },
+  "resultados": [
+    {
+      "query": "¿Qué es el Area Ratio?",
+      "ok": true,
+      "motivo": "",
+      "docs_count": 8,
+      "documentos_fuente": [
+        "IPC-7525A - Stencil Design Guidelines.pdf"
+      ],
+      "chunk_ids": [
+        17,
+        18,
+        22,
+        32,
+        34,
+        35,
+        36,
+        38
+      ]
+    },
+    {
+      "query": "Copia literalmente la definición de Area Ratio.",
+      "ok": true,
+      "motivo": "",
+      "docs_count": 8,
+      "documentos_fuente": [
+        "IPC-7525A - Stencil Design Guidelines.pdf"
+      ],
+      "chunk_ids": [
+        17,
+        18,
+        22,
+        34,
+        35,
+        32,
+        38,
+        36
+      ]
+    },
+    {
+      "query": "¿En qué páginas aparece el término solder paste?",
+      "ok": true,
+      "motivo": "",
+      "docs_count": 8,
+      "documentos_fuente": [
+        "IPC-7525A - Stencil Design Guidelines.pdf"
+      ],
+      "chunk_ids": [
+        59,
+        26,
+        60,
+        35,
+        34,
+        21,
+        40,
+        33
+      ],
+      "paginas_encontradas": [
+        1,
+        2,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        24,
+        26
+      ],
+      "paginas_coincidentes": [
+        5,
+        7,
+        8,
+        9,
+        10,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19
+      ]
+    },
+    {
+      "query": "¿Qué recomendaciones hay sobre Aspect Ratio?",
+      "ok": true,
+      "motivo": "",
+      "docs_count": 8,
+      "documentos_fuente": [
+        "IPC-7525A - Stencil Design Guidelines.pdf"
+      ],
+      "chunk_ids": [
+        41,
+        35,
+        36,
+        45,
+        34,
+        40,
+        18,
+        43
+      ]
+    },
+    {
+      "query": "Resume los apartados relacionados con BGA.",
+      "ok": true,
+      "motivo": "",
+      "docs_count": 8,
+      "documentos_fuente": [
+        "IPC-7525A - Stencil Design Guidelines.pdf",
+        "IPC-7711 - Rework of Electronic Assemblies.pdf"
+      ],
+      "chunk_ids": [
+        66,
+        67,
+        68,
+        69,
+        54,
+        70,
+        68,
+        38
+      ]
+    }
+  ],
+  "pass": 5,
+  "fail": 0,
+  "total": 5
+}

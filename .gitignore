@@ -53,18 +53,12 @@ ENV/
 env/
 .venv
 
-# PyInstaller
+# PyInstaller / builds locales (opcional)
 *.manifest
 *.spec
 build/
 dist/
 *.exe
-compilar.bat
-launcher.py
-
-# Ejecutable portable (solo para Releases)
-Sistema_RAG_Portable/
-Sistema_RAG_Portable.zip
 
 # ============================================
 # DATOS Y ARCHIVOS TEMPORALES
