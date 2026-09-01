@@ -11,34 +11,17 @@ Sistema RAG (Retrieval-Augmented Generation) multi-dominio:
   - IPC-7711 - Rework of Electronic Assemblies (inglés)
   - Manual_Bizneo.pdf (español)
 
-## Estado de evaluación: 8/10 PASS (baseline 30/06/2026)
+## Estado de evaluación: 10/10 PASS (2026-09-01)
 
-Fuente de verdad: `eval_baseline.json`. Vacaciones y QR **ya pasan**. El 7/10 de notas antiguas está desfasado.
+Fuente de verdad: `eval_baseline.json`. Hay que regenerarlo con `python eval_rag.py --baseline` tras esta corrida.
 
-### Tests que funcionan
-1. ¿Qué es el Area Ratio?
-2. Copia literal definición Area Ratio
-3. ¿En qué páginas aparece solder paste?
-4. ¿Cómo se solicitan las vacaciones?
-5. ¿Cómo se ficha la entrada y la salida por QR?
-6. ¿Qué dice exactamente sobre compartir credenciales?
-7. Copia literal aviso fichaje QR
-8. Resume descansos y pausas
+### Tests
+Los 10 casos del harness pasan: Area Ratio, cita literal, páginas solder paste, Aspect Ratio, BGA, vacaciones, QR, credenciales, aviso QR y descansos.
 
-### Tests que fallaban en el baseline
-
-#### FAIL 1: Aspect Ratio
-**Query**: "¿Qué recomendaciones hay sobre Aspect Ratio?"
-**Error**: LLM dice `0.66` (umbral de Area Ratio). El correcto es `>1.5`.
-**Fix aplicado**: priorizar el término más discriminante (`aspect`) en RRF y en el top-k final; regla de prompt para no mezclar umbrales de conceptos distintos.
-
-#### FAIL 2: BGA
-**Query**: "Resume los apartados relacionados con BGA."
-**Error**: retrieval no incluye `IPC-7525A`.
-**Causa**: `diversificar_por_documento` solo reordenaba candidatos que ya habían pasado el corte; el rerank + top-k=8 podía dejar fuera 7525A.
-**Fix aplicado**: cuota por documento **antes** del corte `top_n` sobre el ranking RRF completo; cobertura del término discriminante (`bga`) al elegir el top-k final.
-
-Tras estos cambios hay que reejecutar `python eval_rag.py` (y `--baseline` si 10/10 o si el nuevo 8+/10 debe ser la referencia).
+### Cómo se cerraron los FAIL anteriores
+- **Aspect Ratio**: retrieval prioriza el bigrama `aspect ratio`; el LLM ya no mezcla el umbral `0.66`.
+- **BGA**: cuota por documento + cobertura de `bga`; si el resumen no nombra los PDFs, se anexan (mismo patrón que la nota de páginas exhaustivas). Llama 3.2 ignoraba la instrucción de citar fuentes.
+- **Area Ratio (regresión)**: si la pregunta está en español y el contexto trae *aperture/walls*, se añade la glosa *apertura/paredes*. El modelo no traducía de forma estable.
 
 ## Arquitectura actual
 
@@ -87,4 +70,4 @@ python eval_rag.py --compare    # fallar si un PASS pasa a FAIL
 - `DELETE /limpiar` deshabilitado salvo `X-RAG-Admin-Token` = `RAG_ADMIN_TOKEN`
 
 **Generado**: 01/09/2026
-**Objetivo**: confirmar 10/10 con `eval_rag.py` o decidir qué tests abandonar
+**Objetivo**: mantener 10/10 con `eval_rag.py --compare`

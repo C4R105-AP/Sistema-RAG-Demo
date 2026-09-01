@@ -2,7 +2,7 @@
 
 API de recuperación aumentada (RAG) multi-documento: PDF, DOCX, TXT y MD. Agnóstico de dominio — sin reglas por tipo de documento.
 
-**Estado de evaluación (baseline 30/06/2026): 8/10 PASS.** Fallan Aspect Ratio (el LLM mezcla el umbral 0.66 de Area Ratio) y BGA (el retrieval no incluía IPC-7525A). El resto de casos (vacaciones, QR, credenciales, Area Ratio, páginas) pasan.
+**Estado de evaluación (2026-09-01): 10/10 PASS.** El harness `eval_rag.py --compare` no reporta regresiones respecto al baseline de junio; Aspect Ratio y BGA pasan.
 
 ## Requisitos
 

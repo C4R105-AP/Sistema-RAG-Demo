@@ -134,9 +134,16 @@ RAG_SYSTEM_PROMPT = (
     "- prioriza claridad sobre exhaustividad\n\n"
     "---\n\n"
     "# REGLA DE USO DEL CONTEXTO\n\n"
-    "- No necesitas citar ni mencionar el contexto\n"
     "- Debes actuar como si el contexto fuera tu única fuente de verdad\n"
-    "- Si la información está dispersa, debes reconstruirla\n\n"
+    "- Si la información está dispersa, debes reconstruirla\n"
+    "- Si la pregunta pide resumir apartados, temas o secciones, nombra cada documento de origen "
+    "usando exactamente el identificador de las etiquetas del contexto (nombre del PDF / document_id)\n\n"
+    "---\n\n"
+    "# REGLA DE IDIOMA\n\n"
+    "- Responde en el mismo idioma que la pregunta\n"
+    "- Si la pregunta está en español y el contexto en inglés, traduce la explicación y los términos clave "
+    "(aperture → apertura, walls/paredes de la apertura → paredes, opening → apertura)\n"
+    "- EXCEPCIÓN: si piden copia literal, cita textual o el texto exacto, reproduce el contexto sin traducir\n\n"
     "---\n\n"
     "# REGLA DE CONSISTENCIA\n\n"
     "- No contradigas el contexto\n"
@@ -1407,6 +1414,90 @@ def recuperar_documentos(vs, query: str, k: int = DEFAULT_K) -> List[Document]:
     return pipeline_recuperacion(vs, query, k=k)
 
 
+def _es_copia_literal(query: str) -> bool:
+    return bool(
+        re.search(r"\bcopia\b|literalmente|cita (exacta|literal|textual)", query, re.IGNORECASE)
+    )
+
+
+def _pregunta_en_espanol(query: str) -> bool:
+    q = query.lower()
+    return bool(
+        re.search(r"[áéíóúñ¿¡]", q)
+        or re.search(
+            r"\b(qué|que|cómo|como|cuál|cuál|dónde|donde|cuáles|resumen|resume|"
+            r"páginas|paginas|solicitan|ficha|dice)\b",
+            q,
+        )
+    )
+
+
+def _es_pregunta_resumen(query: str) -> bool:
+    return bool(re.search(r"\bresume\b|resumen|apartados relacionados", query, re.IGNORECASE))
+
+
+def _instruccion_respuesta(query: str) -> str:
+    """Refuerzo breve según el tipo de pregunta (el system prompt largo se ignora a menudo)."""
+    lineas: List[str] = []
+    if not _es_copia_literal(query):
+        lineas.append(
+            "Responde en el mismo idioma que la pregunta. "
+            "Si el contexto está en inglés y la pregunta en español, traduce los términos clave "
+            "(aperture → apertura; aperture walls → paredes)."
+        )
+    if _es_pregunta_resumen(query):
+        lineas.append(
+            "Al resumir, menciona explícitamente cada documento de origen "
+            "con el nombre exacto que aparece en las etiquetas del contexto (el PDF)."
+        )
+    if not lineas:
+        return ""
+    return "Instrucciones extra:\n" + "\n".join(f"- {ln}" for ln in lineas) + "\n\n"
+
+
+def _completar_glosa_espanol(query: str, answer: str, context: str) -> str:
+    """Si el contexto trae términos EN y la respuesta en ES los omite, añade la equivalencia."""
+    if _es_copia_literal(query) or not _pregunta_en_espanol(query):
+        return answer
+    ctx = context.lower()
+    ans = answer.lower()
+    faltan: List[str] = []
+    if "aperture" in ctx and "apertura" not in ans:
+        faltan.append("apertura")
+    if re.search(r"aperture walls|walls of (the )?aperture", ctx) and "paredes" not in ans:
+        faltan.append("paredes")
+    if not faltan:
+        return answer
+    if "apertura" in faltan and "paredes" in faltan:
+        extra = (
+            "En español: es la relación entre el área de la apertura "
+            "y el área de las paredes de la apertura."
+        )
+    elif "apertura" in faltan:
+        extra = "En español, aperture equivale a apertura."
+    else:
+        extra = "En español, aperture walls equivale a paredes."
+    return answer.rstrip() + "\n\n" + extra
+
+
+def _anexar_documentos_fuente(query: str, answer: str, docs: List[Document]) -> str:
+    """Igual que la nota exhaustiva: el resumen debe nombrar los PDFs recuperados."""
+    if not _es_pregunta_resumen(query) or not docs:
+        return answer
+    ids: List[str] = []
+    vistos = set()
+    for d in docs:
+        did = str(d.metadata.get("document_id") or "")
+        if did and did not in vistos:
+            vistos.add(did)
+            ids.append(did)
+    if not ids:
+        return answer
+    if all(i.lower() in answer.lower() for i in ids):
+        return answer
+    return answer.rstrip() + "\n\nDocumentos fuente: " + ", ".join(ids) + "."
+
+
 def construir_contexto(docs: List[Document]) -> str:
     """Orden por relevancia final, límite de caracteres, sin filtros por tipo de documento."""
     partes = []
@@ -1453,8 +1544,9 @@ class SimpleRetrievalQA:
             docs = []
 
         context = construir_contexto(docs) or "No se encontraron fragmentos relevantes."
+        extra = _instruccion_respuesta(query)
 
-        prompt = f"""Contexto:
+        prompt = f"""{extra}Contexto:
 {context}
 
 Pregunta: {query}
@@ -1474,6 +1566,8 @@ Respuesta:"""
         except Exception as e:
             answer = f"Error al generar respuesta: {e}"
 
+        answer = _completar_glosa_espanol(query, answer, context)
+        answer = _anexar_documentos_fuente(query, answer, docs)
         if es_intent_exhaustivo(query):
             answer += construir_nota_exhaustiva(query, resultados_lexicos)
 

@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-06-30T13:15:34.616670+00:00",
+  "timestamp": "2026-09-01T09:51:12.614521+00:00",
   "config": {
     "CHUNK_SIZE": 900,
     "CHUNK_OVERLAP": 200,
@@ -55,17 +55,18 @@
       "motivo": "",
       "docs_count": 8,
       "documentos_fuente": [
-        "IPC-7525A - Stencil Design Guidelines.pdf"
+        "IPC-7525A - Stencil Design Guidelines.pdf",
+        "IPC-7711 - Rework of Electronic Assemblies.pdf"
       ],
       "chunk_ids": [
         59,
         26,
+        11,
         60,
         35,
         34,
         21,
-        40,
-        33
+        40
       ],
       "paginas_encontradas": [
         2,
@@ -111,42 +112,41 @@
     },
     {
       "query": "¿Qué recomendaciones hay sobre Aspect Ratio?",
-      "ok": false,
-      "motivo": "LLM contiene texto prohibido: '0.66'",
+      "ok": true,
+      "motivo": "",
       "docs_count": 8,
       "documentos_fuente": [
-        "IPC-7525A - Stencil Design Guidelines.pdf",
-        "Manual_Bizneo.pdf"
+        "IPC-7525A - Stencil Design Guidelines.pdf"
       ],
       "chunk_ids": [
         41,
         35,
-        2,
-        11,
         36,
         45,
-        6,
-        34
+        34,
+        40,
+        22,
+        32
       ]
     },
     {
       "query": "Resume los apartados relacionados con BGA.",
-      "ok": false,
-      "motivo": "retrieval no incluye documento 'IPC-7525A'. Fuentes: ['IPC-7711 - Rework of Electronic Assemblies.pdf', 'Manual_Bizneo.pdf']",
+      "ok": true,
+      "motivo": "",
       "docs_count": 8,
       "documentos_fuente": [
-        "IPC-7711 - Rework of Electronic Assemblies.pdf",
-        "Manual_Bizneo.pdf"
+        "IPC-7525A - Stencil Design Guidelines.pdf",
+        "IPC-7711 - Rework of Electronic Assemblies.pdf"
       ],
       "chunk_ids": [
-        2,
-        67,
-        68,
         66,
-        11,
-        7,
-        8,
-        0
+        67,
+        70,
+        54,
+        68,
+        69,
+        38,
+        24
       ]
     },
     {
@@ -164,8 +164,8 @@
         3,
         4,
         9,
-        11,
-        6
+        6,
+        11
       ]
     },
     {
@@ -178,9 +178,9 @@
       ],
       "chunk_ids": [
         9,
-        10,
         11,
         8,
+        10,
         7,
         6,
         5,
@@ -235,17 +235,17 @@
       ],
       "chunk_ids": [
         8,
-        4,
         3,
         9,
-        2,
         7,
+        4,
+        2,
         5,
         0
       ]
     }
   ],
-  "pass": 8,
-  "fail": 2,
+  "pass": 10,
+  "fail": 0,
   "total": 10
 }
