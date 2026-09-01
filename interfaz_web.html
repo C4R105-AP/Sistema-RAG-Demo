@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema RAG - Asistente de Documentación</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 32px;
+        }
+
+        .header { text-align: center; margin-bottom: 24px; }
+        .header h1 { color: #667eea; font-size: 2.2rem; margin-bottom: 8px; }
+        .header p { color: #666; }
+
+        .status-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            margin-top: 10px;
+            font-weight: 600;
+        }
+        .status-active { background: #d4edda; color: #155724; }
+        .status-inactive { background: #f8d7da; color: #721c24; }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 0;
+        }
+
+        .tab-btn {
+            padding: 12px 20px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 1rem;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+        .tab-btn.active { color: #667eea; border-bottom-color: #667eea; font-weight: 600; }
+        .tab-btn:hover { color: #667eea; }
+
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        .chat-container {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            min-height: 380px;
+            max-height: 480px;
+            overflow-y: auto;
+            margin-bottom: 16px;
+        }
+
+        .message { margin-bottom: 16px; }
+        .message-user { text-align: right; }
+        .message-bubble {
+            display: inline-block;
+            padding: 14px 18px;
+            border-radius: 18px;
+            max-width: 85%;
+            word-wrap: break-word;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+        }
+        .user-bubble { background: #667eea; color: white; border-bottom-right-radius: 5px; }
+        .assistant-bubble { background: white; color: #333; border: 1px solid #e0e0e0; border-bottom-left-radius: 5px; }
+
+        .sources { margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 10px; font-size: 0.85rem; color: #666; }
+        .source-item { margin-top: 8px; padding: 8px; background: white; border-radius: 6px; border-left: 3px solid #667eea; }
+
+        .input-row { display: flex; gap: 10px; }
+        .input-field {
+            flex: 1;
+            padding: 14px 18px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 1rem;
+            outline: none;
+        }
+        .input-field:focus { border-color: #667eea; }
+
+        .btn {
+            padding: 14px 28px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .btn:hover { transform: translateY(-1px); }
+        .btn:disabled { background: #ccc; cursor: not-allowed; transform: none; }
+        .btn-secondary { background: #6c757d; }
+        .btn-danger { background: #dc3545; }
+
+        .card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 24px;
+            margin-bottom: 16px;
+        }
+
+        .upload-zone {
+            border: 2px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px 20px;
+            text-align: center;
+            color: #667eea;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .upload-zone:hover, .upload-zone.dragover { background: rgba(102,126,234,0.08); }
+        .upload-zone input { display: none; }
+
+        .file-list { margin-top: 16px; }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 14px;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border: 1px solid #eee;
+        }
+
+        .summary-output {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            min-height: 200px;
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+
+        select {
+            padding: 10px 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            margin-right: 10px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 18px; height: 18px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+
+        .welcome-message { text-align: center; color: #999; padding: 40px 20px; }
+        .welcome-message h3 { color: #667eea; margin-bottom: 10px; }
+
+        .doc-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+        .doc-tag {
+            background: #e8ecff;
+            color: #4455aa;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+        }
+
+        .actions-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 16px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📚 Asistente RAG de Documentación</h1>
+            <p>Sube documentos, genera resúmenes y haz preguntas sobre su contenido</p>
+            <div id="status-badge" class="status-badge">Verificando conexión...</div>
+            <div id="doc-tags" class="doc-tags"></div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="chat">💬 Preguntar</button>
+            <button class="tab-btn" data-tab="upload">📤 Subir</button>
+            <button class="tab-btn" data-tab="summary">📝 Resumir</button>
+        </div>
+
+        <!-- PESTAÑA CHAT -->
+        <div id="tab-chat" class="tab-panel active">
+            <div class="chat-container" id="chatContainer">
+                <div class="welcome-message">
+                    <h3>¡Bienvenido!</h3>
+                    <p>Haz preguntas sobre los documentos indexados en el sistema</p>
+                </div>
+            </div>
+            <div class="input-row">
+                <input type="text" id="questionInput" class="input-field"
+                       placeholder="Escribe tu pregunta aquí..." onkeypress="handleKeyPress(event)">
+                <button id="sendButton" class="btn" onclick="sendQuestion()">Enviar</button>
+            </div>
+        </div>
+
+        <!-- PESTAÑA SUBIR -->
+        <div id="tab-upload" class="tab-panel">
+            <div class="card">
+                <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                    <p style="font-size: 2rem; margin-bottom: 8px;">📁</p>
+                    <p><strong>Arrastra archivos aquí</strong> o haz clic para seleccionar</p>
+                    <p style="font-size: 0.85rem; color: #888; margin-top: 8px;">PDF, TXT, MD, DOCX</p>
+                    <input type="file" id="fileInput" multiple accept=".pdf,.txt,.md,.docx">
+                </div>
+                <div class="file-list" id="fileList"></div>
+                <div class="actions-row">
+                    <button class="btn" id="uploadBtn" onclick="uploadFiles()" disabled>Procesar documentos</button>
+                </div>
+                <div id="uploadStatus"></div>
+            </div>
+        </div>
+
+        <!-- PESTAÑA RESUMIR -->
+        <div id="tab-summary" class="tab-panel">
+            <div class="card">
+                <p style="margin-bottom: 16px; color: #666;">
+                    Genera un resumen automático de toda la documentación indexada.
+                </p>
+                <div class="actions-row">
+                    <select id="summaryStyle">
+                        <option value="general">Resumen general</option>
+                        <option value="ejecutivo">Resumen ejecutivo (breve)</option>
+                        <option value="tecnico">Resumen técnico (detallado)</option>
+                    </select>
+                    <button class="btn" id="summaryBtn" onclick="generateSummary()">✨ Generar resumen</button>
+                    <button class="btn btn-secondary" id="downloadBtn" onclick="downloadSummary()" disabled>⬇️ Descargar</button>
+                </div>
+                <div id="summaryStatus" style="margin-top: 12px;"></div>
+                <div class="summary-output" id="summaryOutput" style="margin-top: 16px;">
+                    El resumen aparecerá aquí...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
+            ? window.location.origin
+            : 'http://localhost:8000';
+
+        let DEFAULT_K = null;
+        async function cargarConfig() {
+            try {
+                const c = await fetch(`${API_URL}/config`).then(r => r.json());
+                DEFAULT_K = c.default_k;
+            } catch (e) {
+                console.warn("No se pudo cargar /config:", e);
+            }
+        }
+        cargarConfig();
+
+        let isProcessing = false;
+        let selectedFiles = [];
+        let lastSummary = '';
+
+        // Tabs
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+            });
+        });
+
+        // Upload zone drag & drop
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+        uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+        uploadZone.addEventListener('drop', e => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            addFiles(e.dataTransfer.files);
+        });
+        fileInput.addEventListener('change', () => addFiles(fileInput.files));
+
+        function addFiles(fileList) {
+            for (const f of fileList) {
+                if (!selectedFiles.find(s => s.name === f.name)) selectedFiles.push(f);
+            }
+            renderFileList();
+        }
+
+        function renderFileList() {
+            const list = document.getElementById('fileList');
+            document.getElementById('uploadBtn').disabled = selectedFiles.length === 0;
+            list.replaceChildren();
+            selectedFiles.forEach((f, i) => {
+                const item = document.createElement('div');
+                item.className = 'file-item';
+                const span = document.createElement('span');
+                span.textContent = `📄 ${f.name} (${(f.size/1024).toFixed(1)} KB)`;
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-secondary';
+                btn.style.cssText = 'padding:6px 14px;font-size:0.85rem';
+                btn.textContent = '✕';
+                btn.addEventListener('click', () => removeFile(i));
+                item.append(span, btn);
+                list.appendChild(item);
+            });
+        }
+
+        function removeFile(idx) {
+            selectedFiles.splice(idx, 1);
+            renderFileList();
+        }
+
+        async function checkStatus() {
+            try {
+                const [estado, docs] = await Promise.all([
+                    fetch(`${API_URL}/estado`).then(r => r.json()),
+                    fetch(`${API_URL}/documentos`).then(r => r.json()),
+                ]);
+
+                const badge = document.getElementById('status-badge');
+                if (estado.vectorstore_cargado) {
+                    badge.textContent = `✅ Sistema activo — ${estado.total_documentos || 0} fragmentos indexados`;
+                    badge.className = 'status-badge status-active';
+                } else {
+                    badge.textContent = '⚠️ Sin documentos — sube archivos para empezar';
+                    badge.className = 'status-badge status-inactive';
+                }
+
+                const tags = document.getElementById('doc-tags');
+                tags.replaceChildren();
+                (docs.archivos || []).forEach(f => {
+                    const tag = document.createElement('span');
+                    tag.className = 'doc-tag';
+                    tag.textContent = f;
+                    tags.appendChild(tag);
+                });
+            } catch {
+                document.getElementById('status-badge').textContent = '❌ API no disponible — ejecuta launcher.py';
+                document.getElementById('status-badge').className = 'status-badge status-inactive';
+            }
+        }
+
+        async function uploadFiles() {
+            const status = document.getElementById('uploadStatus');
+            const btn = document.getElementById('uploadBtn');
+            btn.disabled = true;
+            status.innerHTML = '<div class="loading"></div> Procesando documentos...';
+
+            let ok = 0, errors = [];
+            for (const file of selectedFiles) {
+                const form = new FormData();
+                form.append('archivo', file);
+                try {
+                    const res = await fetch(`${API_URL}/subir-documento`, { method: 'POST', body: form });
+                    const data = await res.json();
+                    if (res.ok) ok++;
+                    else errors.push(`${file.name}: ${data.detail || 'Error'}`);
+                } catch (e) {
+                    errors.push(`${file.name}: ${e.message}`);
+                }
+            }
+
+            selectedFiles = [];
+            renderFileList();
+            btn.disabled = false;
+
+            if (ok) {
+                status.replaceChildren();
+                const p = document.createElement('p');
+                p.style.color = '#155724';
+                p.textContent = `✅ ${ok} documento(s) indexado(s) correctamente.`;
+                status.appendChild(p);
+            }
+            if (errors.length) {
+                errors.forEach(msg => {
+                    const err = document.createElement('div');
+                    err.className = 'error-message';
+                    err.textContent = msg;
+                    status.appendChild(err);
+                });
+            }
+            checkStatus();
+        }
+
+        async function generateSummary() {
+            const btn = document.getElementById('summaryBtn');
+            const output = document.getElementById('summaryOutput');
+            const status = document.getElementById('summaryStatus');
+            const style = document.getElementById('summaryStyle').value;
+
+            btn.disabled = true;
+            status.innerHTML = '<div class="loading"></div> Generando resumen...';
+            output.textContent = '';
+
+            try {
+                const res = await fetch(`${API_URL}/resumir`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ estilo: style, k: 12 }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Error al resumir');
+
+                lastSummary = data.resumen;
+                output.textContent = data.resumen;
+                status.replaceChildren();
+                const p = document.createElement('p');
+                p.style.color = '#666';
+                p.textContent = `Basado en ${data.fragmentos_usados} fragmentos (${data.estilo})`;
+                status.appendChild(p);
+                document.getElementById('downloadBtn').disabled = false;
+            } catch (e) {
+                status.replaceChildren();
+                const err = document.createElement('div');
+                err.className = 'error-message';
+                err.textContent = e.message;
+                status.appendChild(err);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function downloadSummary() {
+            const blob = new Blob([lastSummary], { type: 'text/plain;charset=utf-8' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'resumen_documentacion.txt';
+            a.click();
+        }
+
+        function addMessage(text, isUser, sources = null) {
+            const chat = document.getElementById('chatContainer');
+            const welcome = chat.querySelector('.welcome-message');
+            if (welcome) welcome.remove();
+
+            const div = document.createElement('div');
+            div.className = `message ${isUser ? 'message-user' : ''}`;
+            const bubble = document.createElement('div');
+            bubble.className = `message-bubble ${isUser ? 'user-bubble' : 'assistant-bubble'}`;
+            bubble.textContent = text;
+            div.appendChild(bubble);
+
+            if (!isUser && sources?.length) {
+                const src = document.createElement('div');
+                src.className = 'sources';
+                const strong = document.createElement('strong');
+                strong.textContent = '📚 Fuentes:';
+                src.appendChild(strong);
+                sources.forEach((s, i) => {
+                    const item = document.createElement('div');
+                    item.className = 'source-item';
+                    const label = document.createElement('strong');
+                    label.textContent = `${i + 1}. `;
+                    item.appendChild(label);
+                    item.appendChild(document.createTextNode(s.contenido || ''));
+                    src.appendChild(item);
+                });
+                div.appendChild(src);
+            }
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        async function sendQuestion() {
+            if (isProcessing) return;
+            const input = document.getElementById('questionInput');
+            const question = input.value.trim();
+            if (!question) return;
+
+            isProcessing = true;
+            const btn = document.getElementById('sendButton');
+            btn.disabled = true;
+            addMessage(question, true);
+            input.value = '';
+
+            const loading = document.createElement('div');
+            loading.id = 'loading-msg';
+            loading.className = 'message';
+            loading.innerHTML = '<div class="message-bubble assistant-bubble"><div class="loading"></div> Buscando en la documentación...</div>';
+            document.getElementById('chatContainer').appendChild(loading);
+
+            try {
+                const body = DEFAULT_K !== null
+                    ? { pregunta: question, k: DEFAULT_K }
+                    : { pregunta: question };
+
+                const res = await fetch(`${API_URL}/preguntar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Error');
+
+                loading.remove();
+                addMessage(data.respuesta, false, data.documentos_fuente);
+            } catch (e) {
+                loading.remove();
+                addMessage('❌ ' + e.message, false);
+            } finally {
+                isProcessing = false;
+                btn.disabled = false;
+            }
+        }
+
+        function handleKeyPress(e) { if (e.key === 'Enter') sendQuestion(); }
+
+        checkStatus();
+        setInterval(checkStatus, 30000);
+    </script>
+</body>
+</html>

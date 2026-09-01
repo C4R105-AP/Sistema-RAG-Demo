@@ -1,13 +1,13 @@
 {
-  "timestamp": "2026-06-16T12:47:53.358818+00:00",
+  "timestamp": "2026-06-30T13:15:34.616670+00:00",
   "config": {
     "CHUNK_SIZE": 900,
     "CHUNK_OVERLAP": 200,
     "CHUNK_SIZE_env": "900",
     "CHUNK_OVERLAP_env": null,
     "DEFAULT_K": 8,
-    "total_chunks": 182,
-    "bm25_chunks": 182,
+    "total_chunks": 195,
+    "bm25_chunks": 195,
     "sincronizado": true
   },
   "resultados": [
@@ -68,8 +68,8 @@
         33
       ],
       "paginas_encontradas": [
-        1,
         2,
+        3,
         4,
         5,
         6,
@@ -89,8 +89,9 @@
         20,
         21,
         22,
-        24,
-        26
+        23,
+        25,
+        27
       ],
       "paginas_coincidentes": [
         5,
@@ -110,45 +111,141 @@
     },
     {
       "query": "¿Qué recomendaciones hay sobre Aspect Ratio?",
-      "ok": true,
-      "motivo": "",
+      "ok": false,
+      "motivo": "LLM contiene texto prohibido: '0.66'",
       "docs_count": 8,
       "documentos_fuente": [
-        "IPC-7525A - Stencil Design Guidelines.pdf"
+        "IPC-7525A - Stencil Design Guidelines.pdf",
+        "Manual_Bizneo.pdf"
       ],
       "chunk_ids": [
         41,
         35,
+        2,
+        11,
         36,
         45,
-        34,
-        40,
-        18,
-        43
+        6,
+        34
       ]
     },
     {
       "query": "Resume los apartados relacionados con BGA.",
+      "ok": false,
+      "motivo": "retrieval no incluye documento 'IPC-7525A'. Fuentes: ['IPC-7711 - Rework of Electronic Assemblies.pdf', 'Manual_Bizneo.pdf']",
+      "docs_count": 8,
+      "documentos_fuente": [
+        "IPC-7711 - Rework of Electronic Assemblies.pdf",
+        "Manual_Bizneo.pdf"
+      ],
+      "chunk_ids": [
+        2,
+        67,
+        68,
+        66,
+        11,
+        7,
+        8,
+        0
+      ]
+    },
+    {
+      "query": "¿Cómo se solicitan las vacaciones?",
       "ok": true,
       "motivo": "",
       "docs_count": 8,
       "documentos_fuente": [
-        "IPC-7525A - Stencil Design Guidelines.pdf",
-        "IPC-7711 - Rework of Electronic Assemblies.pdf"
+        "Manual_Bizneo.pdf"
       ],
       "chunk_ids": [
-        66,
-        67,
-        68,
-        69,
-        54,
-        70,
-        68,
-        38
+        2,
+        8,
+        7,
+        3,
+        4,
+        9,
+        11,
+        6
+      ]
+    },
+    {
+      "query": "¿Cómo se ficha la entrada y la salida por QR?",
+      "ok": true,
+      "motivo": "",
+      "docs_count": 8,
+      "documentos_fuente": [
+        "Manual_Bizneo.pdf"
+      ],
+      "chunk_ids": [
+        9,
+        10,
+        11,
+        8,
+        7,
+        6,
+        5,
+        4
+      ]
+    },
+    {
+      "query": "¿Qué dice exactamente el documento sobre compartir credenciales?",
+      "ok": true,
+      "motivo": "",
+      "docs_count": 8,
+      "documentos_fuente": [
+        "Manual_Bizneo.pdf"
+      ],
+      "chunk_ids": [
+        11,
+        12,
+        0,
+        8,
+        10,
+        2,
+        7,
+        9
+      ]
+    },
+    {
+      "query": "Copia literalmente el aviso importante del fichaje por QR.",
+      "ok": true,
+      "motivo": "",
+      "docs_count": 8,
+      "documentos_fuente": [
+        "Manual_Bizneo.pdf"
+      ],
+      "chunk_ids": [
+        8,
+        9,
+        0,
+        3,
+        6,
+        2,
+        7,
+        10
+      ]
+    },
+    {
+      "query": "Resume todos los apartados relacionados con descansos y pausas.",
+      "ok": true,
+      "motivo": "",
+      "docs_count": 8,
+      "documentos_fuente": [
+        "Manual_Bizneo.pdf"
+      ],
+      "chunk_ids": [
+        8,
+        4,
+        3,
+        9,
+        2,
+        7,
+        5,
+        0
       ]
     }
   ],
-  "pass": 5,
-  "fail": 0,
-  "total": 5
+  "pass": 8,
+  "fail": 2,
+  "total": 10
 }

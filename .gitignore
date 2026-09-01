@@ -1,29 +1,6 @@
 # ============================================
-# CÓDIGO FUENTE (NO SUBIR - SOLO EJECUTABLE EN RELEASES)
+# SECRETOS Y CREDENCIALES
 # ============================================
-
-# Todo el código fuente Python
-*.py
-api_rag.py
-cliente_rag.py
-
-# Archivos web
-*.html
-interfaz_web.html
-
-# Dependencias y configuración
-requirements.txt
-*.txt
-!LICENSE
-
-# Documentos (incluidos en el ejecutable)
-uploaded_docs/
-
-# ============================================
-# PROTECCIÓN DE CREDENCIALES Y DATOS SENSIBLES
-# ============================================
-
-# API Keys y configuración sensible
 .env
 *.env
 .env.local
@@ -31,29 +8,25 @@ config.bat
 *.key
 claveopenai.txt
 *clave*.txt
-*key*.txt
-
-# Archivos de configuración con credenciales
 *_config.py
 secrets.json
 
 # ============================================
 # PYTHON
 # ============================================
-
-# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-
-# Virtual environments
+*.pyc
+*.pyo
+*.pyd
 venv/
 ENV/
 env/
 .venv
 
-# PyInstaller / builds locales (opcional)
+# PyInstaller / builds
 *.manifest
 *.spec
 build/
@@ -61,74 +34,52 @@ dist/
 *.exe
 
 # ============================================
-# DATOS Y ARCHIVOS TEMPORALES
+# DATOS REGENERABLES
 # ============================================
-
-# Documentos subidos (opcional - descomenta si no quieres subir PDFs)
-# uploaded_docs/*.pdf
-
-# Vectorstores (son grandes y se pueden regenerar)
+uploaded_docs/
 vectorstore_faiss/
 vectorstore_*/
-
-# Cache
-*.pyc
-*.pyo
-*.pyd
 .cache/
+
+# ============================================
+# SALIDAS DE EVALUACIÓN Y PRUEBAS AD HOC
+# ============================================
+eval_*.log
+eval_*.txt
+eval_output*
+output*.txt
+rag_answer.txt
+respuesta_*.txt
+resultado_*.txt
+resultado_pregunta.json
+test_*.txt
+logs/
+temp/
+tmp/
+*.tmp
+*.bak
+*.swp
 *.log
 
 # ============================================
-# IDEs y EDITORES
+# IDEs
 # ============================================
-
-# VSCode
 .vscode/
 *.code-workspace
-
-# PyCharm
 .idea/
 *.iml
-
-# Jupyter
 .ipynb_checkpoints/
 *.ipynb
 
 # ============================================
 # SISTEMA OPERATIVO
 # ============================================
-
-# Windows
 Thumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 *.lnk
-
-# macOS
 .DS_Store
 .AppleDouble
 .LSOverride
-
-# Linux
 *~
 .directory
-
-# ============================================
-# OTROS
-# ============================================
-
-# Logs
-*.log
-logs/
-
-# Temporales
-temp/
-tmp/
-*.tmp
-*.bak
-*.swp
-
-# Compilación
-*.o
-*.obj
-
