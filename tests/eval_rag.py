@@ -39,6 +39,7 @@ if os.getenv("EVAL_DEBUG", "").lower() not in ("1", "true", "yes"):
     os.environ["DIAG_PIPELINE"] = "false"
 
 import rag.api as api_rag  # noqa: E402
+from rag import config as rag_config  # noqa: E402
 
 BASELINE_PATH = Path(__file__).resolve().parent / "eval_baseline.json"
 
@@ -137,8 +138,8 @@ def _snapshot_config() -> Dict[str, Any]:
 
 
 def _cargar_sistema() -> None:
-    api_rag.DEBUG_RAG = os.getenv("EVAL_DEBUG", "").lower() in ("1", "true", "yes")
-    api_rag.DIAG_PIPELINE = api_rag.DEBUG_RAG
+    rag_config.DEBUG_RAG = os.getenv("EVAL_DEBUG", "").lower() in ("1", "true", "yes")
+    rag_config.DIAG_PIPELINE = rag_config.DEBUG_RAG
     if not api_rag.cargar_vectorstore_global():
         raise RuntimeError("No se pudo cargar el vectorstore. ¿Existe vectorstore_faiss/?")
     if api_rag.vectorstore is None:

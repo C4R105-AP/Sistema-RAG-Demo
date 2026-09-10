@@ -56,7 +56,9 @@ python tests/eval_rag.py --compare    # fallar si un PASS pasa a FAIL
 
 ## Archivos de interés
 
-- `rag/api.py` — pipeline RAG y API
+- `rag/api.py` — FastAPI (endpoints)
+- `rag/retrieval.py` / `rag/qa.py` — pipeline y postproceso
+- `rag/ingest.py` / `rag/store.py` / `rag/llm.py` — ingesta, índice y modelos
 - `launcher.py` — arranque (bind `127.0.0.1` por defecto)
 - `web/interfaz_web.html` — UI en `/app`
 - `tests/eval_rag.py` — harness de 10 tests

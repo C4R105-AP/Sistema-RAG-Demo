@@ -163,7 +163,13 @@ El índice FAISS se carga con deserialización local (pickle). Trátalo como dat
 ├── launcher.py          # Arranque
 ├── api_rag.py           # Compatibilidad: reexporta rag.api
 ├── rag/                 # Paquete de la aplicación
-│   ├── api.py           # FastAPI + pipeline
+│   ├── api.py           # FastAPI (endpoints)
+│   ├── config.py        # Constantes y prompts
+│   ├── ingest.py        # PDF/DOCX y chunking
+│   ├── retrieval.py     # BM25 + RRF + rerank
+│   ├── qa.py            # Postproceso y cadena QA
+│   ├── llm.py           # Embeddings y LLM
+│   ├── store.py         # Carga/reindexado FAISS
 │   └── paths.py         # Rutas (data/, web/)
 ├── web/                 # Interfaz estática
 ├── tests/               # eval_rag.py y baseline
