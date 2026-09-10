@@ -59,6 +59,7 @@ def main() -> None:
     if llm_type.lower() == "fake":
         print("  (modo demo: búsqueda sí, respuestas reales no)")
         print("  Para generar: instala Ollama + `ollama pull llama3.2` y LLM_TYPE=ollama")
+    print(f"  Datos:    {PROJECT_ROOT / 'data'}")
     print(f"  Bind:     {HOST}:{PORT}")
     print(f"  Interfaz: http://localhost:{PORT}/app")
     print(f"  API docs: http://localhost:{PORT}/docs")
@@ -69,7 +70,7 @@ def main() -> None:
     threading.Thread(target=abrir_navegador_cuando_listo, daemon=True).start()
 
     import uvicorn
-    from api_rag import app
+    from rag.api import app
 
     try:
         uvicorn.run(app, host=HOST, port=PORT, log_level="info")

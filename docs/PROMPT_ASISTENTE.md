@@ -49,18 +49,18 @@ ChatOllama(
 Única puerta de evaluación: `eval_rag.py`.
 
 ```bash
-python eval_rag.py              # 10 tests con Ollama
-python eval_rag.py --baseline   # guardar eval_baseline.json
-python eval_rag.py --compare    # fallar si un PASS pasa a FAIL
+python tests/eval_rag.py              # 10 tests con Ollama
+python tests/eval_rag.py --baseline   # guardar eval_baseline.json
+python tests/eval_rag.py --compare    # fallar si un PASS pasa a FAIL
 ```
 
 ## Archivos de interés
 
-- `api_rag.py` — pipeline RAG y API
+- `rag/api.py` — pipeline RAG y API
 - `launcher.py` — arranque (bind `127.0.0.1` por defecto)
-- `interfaz_web.html` — UI en `/app`
-- `eval_rag.py` — harness de 10 tests
-- `eval_baseline.json` — último baseline versionado
+- `web/interfaz_web.html` — UI en `/app`
+- `tests/eval_rag.py` — harness de 10 tests
+- `tests/eval_baseline.json` — último baseline versionado
 
 ## Seguridad mínima (aplicada)
 

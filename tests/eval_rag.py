@@ -2,9 +2,9 @@
 Evaluación de regresión del pipeline RAG.
 
 Uso:
-  python eval_rag.py              # ejecutar tests y mostrar resultado
-  python eval_rag.py --baseline   # guardar resultado como baseline (eval_baseline.json)
-  python eval_rag.py --compare      # comparar con baseline; exit code 1 si hay regresión
+  python tests/eval_rag.py              # ejecutar tests y mostrar resultado
+  python tests/eval_rag.py --baseline   # guardar resultado como baseline
+  python tests/eval_rag.py --compare    # comparar con baseline; exit 1 si hay regresión
 
 Reglas:
   1. Ejecutar --baseline antes de cambiar el pipeline.
@@ -27,14 +27,18 @@ from typing import Any, Dict, List, Optional, Set
 
 from dotenv import load_dotenv
 
-load_dotenv()
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+load_dotenv(ROOT / ".env")
 
 # Silenciar debug del pipeline durante eval (se puede sobreescribir con EVAL_DEBUG=1)
 if os.getenv("EVAL_DEBUG", "").lower() not in ("1", "true", "yes"):
     os.environ["DEBUG_RAG"] = "false"
     os.environ["DIAG_PIPELINE"] = "false"
 
-import api_rag  # noqa: E402
+import rag.api as api_rag  # noqa: E402
 
 BASELINE_PATH = Path(__file__).resolve().parent / "eval_baseline.json"
 

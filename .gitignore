@@ -34,8 +34,10 @@ dist/
 *.exe
 
 # ============================================
-# DATOS REGENERABLES
-# ============================================
+# Datos regenerables (índice y documentos)
+data/uploaded_docs/**
+!data/uploaded_docs/.gitkeep
+data/vectorstore_faiss/
 uploaded_docs/
 vectorstore_faiss/
 vectorstore_*/

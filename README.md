@@ -9,8 +9,8 @@ Por defecto corre **en local** (Ollama + embeddings en CPU). No hace falta expon
 
 ## Qué hace
 
-1. **Ingesta** — extrae texto de los archivos en `uploaded_docs/`, limpia artefactos de PDF y parte en chunks (~900 caracteres, solape 200).
-2. **Índice** — embeddings multilingües (sentence-transformers) + FAISS en disco (`vectorstore_faiss/`).
+1. **Ingesta** — extrae texto de los archivos en `data/uploaded_docs/`, limpia artefactos de PDF y parte en chunks (~900 caracteres, solape 200).
+2. **Índice** — embeddings multilingües (sentence-transformers) + FAISS en disco (`data/vectorstore_faiss/`).
 3. **Retrieval híbrido** — BM25 + búsqueda semántica, fusión RRF, cuota por documento, rerank con cross-encoder y deduplicación.
 4. **Generación** — el LLM solo ve el contexto recuperado. Citas literales y listados de páginas se resuelven sobre el corpus, no inventando.
 5. **Chat** — interfaz en `/app`: fuentes plegadas y botón *Traducir al castellano* solo si la respuesta está en inglés.
@@ -57,7 +57,7 @@ RAG_HOST=127.0.0.1
 
 Si Ollama no está instalado o no responde, el arranque cae a **modo demo** (`fake`): se puede buscar en el índice, pero no hay generación real.
 
-Coloca los PDF/DOCX/TXT/MD en `uploaded_docs/` y reconstruye el índice una vez:
+Coloca los PDF/DOCX/TXT/MD en `data/uploaded_docs/` y reconstruye el índice una vez:
 
 ```
 POST http://localhost:8000/reindexar
@@ -71,7 +71,7 @@ o súbelos desde la pestaña de la interfaz.
 .\venv\Scripts\python.exe launcher.py
 ```
 
-También válido: `.\venv\Scripts\python.exe api_rag.py` (redirige al launcher).
+También válido: `.\venv\Scripts\python.exe api_rag.py` (compatibilidad; redirige al launcher).
 
 - Interfaz: http://localhost:8000/app
 - API: http://localhost:8000/docs
@@ -109,12 +109,12 @@ Intents especiales:
 Única puerta: `eval_rag.py` (10 casos; requiere Ollama).
 
 ```powershell
-.\venv\Scripts\python.exe eval_rag.py
-.\venv\Scripts\python.exe eval_rag.py --baseline
-.\venv\Scripts\python.exe eval_rag.py --compare
+.\venv\Scripts\python.exe tests\eval_rag.py
+.\venv\Scripts\python.exe tests\eval_rag.py --baseline
+.\venv\Scripts\python.exe tests\eval_rag.py --compare
 ```
 
-El último baseline versionado está en `eval_baseline.json`. Un `--compare` con código 0 significa que no hay regresiones respecto a ese archivo.
+El último baseline versionado está en `tests/eval_baseline.json`. Un `--compare` con código 0 significa que no hay regresiones respecto a ese archivo.
 
 ## Endpoints
 
@@ -156,17 +156,26 @@ No pegues claves de API ni tokens en el README, en issues ni en commits. Si usas
 
 El índice FAISS se carga con deserialización local (pickle). Trátalo como dato de confianza de tu máquina; no abras índices de terceros.
 
-## Archivos principales
+## Estructura del repositorio
 
-| Archivo | Función |
-|---------|---------|
-| `launcher.py` | Arranque (venv, puerto, navegador) |
-| `api_rag.py` | Ingesta, retrieval, LLM y API |
-| `interfaz_web.html` | UI |
-| `eval_rag.py` | Harness de regresión |
-| `.env.example` | Plantilla de configuración |
+```
+.
+├── launcher.py          # Arranque
+├── api_rag.py           # Compatibilidad: reexporta rag.api
+├── rag/                 # Paquete de la aplicación
+│   ├── api.py           # FastAPI + pipeline
+│   └── paths.py         # Rutas (data/, web/)
+├── web/                 # Interfaz estática
+├── tests/               # eval_rag.py y baseline
+├── docs/                # Notas para desarrollo
+├── data/                # Runtime (no se versiona el índice ni los PDF)
+│   ├── uploaded_docs/
+│   └── vectorstore_faiss/
+├── .env.example
+└── requirements.txt
+```
 
-`uploaded_docs/` y `vectorstore_faiss/` no van al git: se regeneran en cada entorno.
+El índice y los documentos viven en `data/` (configurable con `RAG_DATA_DIR`). No se suben a git.
 
 ## Licencia
 
