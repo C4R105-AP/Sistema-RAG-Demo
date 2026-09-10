@@ -86,8 +86,52 @@
         .user-bubble { background: #667eea; color: white; border-bottom-right-radius: 5px; }
         .assistant-bubble { background: white; color: #333; border: 1px solid #e0e0e0; border-bottom-left-radius: 5px; }
 
-        .sources { margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 10px; font-size: 0.85rem; color: #666; }
-        .source-item { margin-top: 8px; padding: 8px; background: white; border-radius: 6px; border-left: 3px solid #667eea; }
+        .sources {
+            margin-top: 8px;
+            max-width: 85%;
+            font-size: 0.85rem;
+            color: #666;
+        }
+        .sources-fold {
+            background: #f0f0f0;
+            border-radius: 10px;
+            padding: 0 10px;
+        }
+        .sources-fold > summary {
+            cursor: pointer;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 4px;
+            font-weight: 600;
+            color: #555;
+            user-select: none;
+        }
+        .sources-fold > summary::-webkit-details-marker { display: none; }
+        .sources-fold > summary::before {
+            content: "▸";
+            font-size: 0.85rem;
+            color: #667eea;
+            transition: transform 0.15s ease;
+        }
+        .sources-fold[open] > summary::before { transform: rotate(90deg); }
+        .sources-fold > summary:hover { color: #667eea; }
+        .source-item { margin: 0 0 8px; padding: 8px; background: white; border-radius: 6px; border-left: 3px solid #667eea; }
+        .sources-fold[open] .source-item:last-child { margin-bottom: 10px; }
+
+        .msg-actions { margin-top: 6px; max-width: 85%; }
+        .btn-link {
+            background: none;
+            border: none;
+            color: #667eea;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 4px 0;
+        }
+        .btn-link:hover { text-decoration: underline; }
+        .btn-link:disabled { color: #aaa; cursor: not-allowed; text-decoration: none; }
 
         .input-row { display: flex; gap: 10px; }
         .input-field {
@@ -288,6 +332,13 @@
         let isProcessing = false;
         let selectedFiles = [];
         let lastSummary = '';
+        let lastTurn = { pregunta: '', respuesta: '' };
+
+        function esSeguimiento(q) {
+            const s = q.trim().toLowerCase();
+            if (s.length > 180) return false;
+            return /traduc|castellano|espa[nñ]ol|la puedes|lo puedes|esa respuesta|ese texto|expl[ií]calo|m[aá]s corto|m[aá]s claro/.test(s);
+        }
 
         // Tabs
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -461,7 +512,17 @@
             a.click();
         }
 
-        function addMessage(text, isUser, sources = null) {
+        function pareceIngles(text) {
+            const t = (text || '').toLowerCase();
+            if (!t.trim()) return false;
+            if (/[áéíóúñ¿¡]/.test(t)) return false;
+            if (/búsqueda exhaustiva|documentos fuente|no aparece en los documentos/.test(t)) return false;
+            const en = (t.match(/\b(the|of|and|to|for|with|this|that|area|ratio|aperture|stencil|walls|opening)\b/g) || []).length;
+            const es = (t.match(/\b(el|la|los|las|que|para|cómo|como|según|debe|esta|este)\b/g) || []).length;
+            return en >= 3 && en > es;
+        }
+
+        function addMessage(text, isUser, sources = null, opts = {}) {
             const chat = document.getElementById('chatContainer');
             const welcome = chat.querySelector('.welcome-message');
             if (welcome) welcome.remove();
@@ -473,12 +534,26 @@
             bubble.textContent = text;
             div.appendChild(bubble);
 
+            if (!isUser && opts.allowTranslate !== false && pareceIngles(text)) {
+                const actions = document.createElement('div');
+                actions.className = 'msg-actions';
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'btn-link';
+                btn.textContent = 'Traducir al castellano';
+                btn.addEventListener('click', () => traducirRespuesta(opts.pregunta || lastTurn.pregunta, text, btn));
+                actions.appendChild(btn);
+                div.appendChild(actions);
+            }
+
             if (!isUser && sources?.length) {
-                const src = document.createElement('div');
-                src.className = 'sources';
-                const strong = document.createElement('strong');
-                strong.textContent = '📚 Fuentes:';
-                src.appendChild(strong);
+                const wrap = document.createElement('div');
+                wrap.className = 'sources';
+                const fold = document.createElement('details');
+                fold.className = 'sources-fold';
+                const summary = document.createElement('summary');
+                summary.textContent = `Fuentes (${sources.length})`;
+                fold.appendChild(summary);
                 sources.forEach((s, i) => {
                     const item = document.createElement('div');
                     item.className = 'source-item';
@@ -486,9 +561,10 @@
                     label.textContent = `${i + 1}. `;
                     item.appendChild(label);
                     item.appendChild(document.createTextNode(s.contenido || ''));
-                    src.appendChild(item);
+                    fold.appendChild(item);
                 });
-                div.appendChild(src);
+                wrap.appendChild(fold);
+                div.appendChild(wrap);
             }
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
@@ -516,6 +592,10 @@
                 const body = DEFAULT_K !== null
                     ? { pregunta: question, k: DEFAULT_K }
                     : { pregunta: question };
+                if (esSeguimiento(question) && lastTurn.pregunta && lastTurn.respuesta) {
+                    body.pregunta_anterior = lastTurn.pregunta;
+                    body.respuesta_anterior = lastTurn.respuesta;
+                }
 
                 const res = await fetch(`${API_URL}/preguntar`, {
                     method: 'POST',
@@ -526,13 +606,48 @@
                 if (!res.ok) throw new Error(data.detail || 'Error');
 
                 loading.remove();
-                addMessage(data.respuesta, false, data.documentos_fuente);
+                addMessage(data.respuesta, false, data.documentos_fuente, { pregunta: question });
+                if (!esSeguimiento(question)) {
+                    lastTurn = { pregunta: question, respuesta: data.respuesta };
+                } else {
+                    lastTurn.respuesta = data.respuesta;
+                }
             } catch (e) {
                 loading.remove();
                 addMessage('❌ ' + e.message, false);
             } finally {
                 isProcessing = false;
                 btn.disabled = false;
+            }
+        }
+
+        async function traducirRespuesta(pregunta, texto, btn) {
+            if (isProcessing || !texto) return;
+            isProcessing = true;
+            if (btn) btn.disabled = true;
+            const sendBtn = document.getElementById('sendButton');
+            sendBtn.disabled = true;
+            try {
+                const body = {
+                    pregunta: 'traducir al castellano',
+                    pregunta_anterior: pregunta || lastTurn.pregunta || '',
+                    respuesta_anterior: texto,
+                };
+                if (DEFAULT_K !== null) body.k = DEFAULT_K;
+                const res = await fetch(`${API_URL}/preguntar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Error al traducir');
+                addMessage(data.respuesta, false, data.documentos_fuente, { allowTranslate: false });
+            } catch (e) {
+                addMessage('❌ ' + e.message, false, null, { allowTranslate: false });
+            } finally {
+                isProcessing = false;
+                sendBtn.disabled = false;
+                if (btn) btn.disabled = false;
             }
         }
 

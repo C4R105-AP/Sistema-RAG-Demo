@@ -56,6 +56,9 @@ def main() -> None:
     print("=" * 70)
     print(f"  Python:   {sys.executable}")
     print(f"  LLM:      {llm_type}")
+    if llm_type.lower() == "fake":
+        print("  (modo demo: búsqueda sí, respuestas reales no)")
+        print("  Para generar: instala Ollama + `ollama pull llama3.2` y LLM_TYPE=ollama")
     print(f"  Bind:     {HOST}:{PORT}")
     print(f"  Interfaz: http://localhost:{PORT}/app")
     print(f"  API docs: http://localhost:{PORT}/docs")

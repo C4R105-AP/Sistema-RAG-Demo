@@ -69,5 +69,7 @@ python eval_rag.py --compare    # fallar si un PASS pasa a FAIL
 - Chat con `textContent` (sin `innerHTML` de pregunta/respuesta/chunks)
 - `DELETE /limpiar` deshabilitado salvo `X-RAG-Admin-Token` = `RAG_ADMIN_TOKEN`
 
-**Generado**: 01/09/2026
+**Generado**: 10/09/2026
 **Objetivo**: mantener 10/10 con `eval_rag.py --compare`
+
+Además del harness: rechazo rápido si la query no está en el índice; citas literales desde el corpus; nota de páginas sin listado del LLM; botón *Traducir* solo en respuestas en inglés.

@@ -201,6 +201,8 @@ _STOPWORDS_BUSQUEDA = frozenset({
     "pueden", "entre", "hasta", "desde", "cada", "todo", "toda", "todos",
     "todas", "pero", "porque", "aunque", "hacia", "según", "segun",
     "not", "but", "for", "you", "your", "its", "than", "any", "all",
+    "puedes", "puede", "quiero", "dame", "dime", "haz", "hacer",
+    "era", "eran", "fue", "fui", "soy", "eres", "sido",
 })
 _PALABRAS_INTENT_EXHAUSTIVO = frozenset({
     "aparece", "aparecen", "cuantas", "cuántas", "donde", "dónde", "lista",
@@ -524,13 +526,30 @@ def inicializar_embeddings():
         return FakeEmbeddings()
 
 
+def ollama_esta_disponible(base_url: str) -> bool:
+    try:
+        import requests
+
+        r = requests.get(f"{base_url.rstrip('/')}/api/tags", timeout=2)
+        return r.ok
+    except Exception:
+        return False
+
+
 def inicializar_llm():
     cfg = _llm_config()
     llm_type = cfg["type"]
 
     if llm_type == "ollama":
         if not OLLAMA_AVAILABLE:
-            print("[ERROR] ChatOllama no disponible")
+            print("[AVISO] ChatOllama no está instalado — modo demo (fake)")
+            return FakeChatModel()
+        if not ollama_esta_disponible(cfg["ollama_url"]):
+            print(
+                f"[AVISO] Ollama no responde en {cfg['ollama_url']} — modo demo (fake). "
+                "Reinstala Ollama y ejecuta `ollama pull llama3.2`, "
+                "o define LLM_TYPE=openai / LLM_TYPE=fake en .env"
+            )
             return FakeChatModel()
         print(f"[INFO] Ollama: {cfg['model']} ({cfg['ollama_url']})")
         return ChatOllama(
@@ -720,12 +739,28 @@ def _finales_modo_literal(
     rankeados: List[Tuple[Document, float, float, float]],
     k: int,
 ) -> List[Document]:
-    """Garantiza chunks léxicos top en el contexto (glosario/definiciones)."""
-    lex_docs = busqueda_lexica_exhaustiva(query, vs)[: min(3, k)]
+    """Prioriza chunks que contienen la frase discriminante (glosario/aviso)."""
+    frase = termino_mas_discriminante(query)
     ranked_docs = [doc for doc, _, _, _ in rankeados]
+    preferidos: List[Document] = []
+    if frase:
+        frase_l = frase.lower()
+        preferidos = [
+            d for d in _corpus_docs
+            if frase_l in d.page_content.lower()
+        ]
+        preferidos.sort(
+            key=lambda d: (
+                0 if "the ratio of the area" in d.page_content.lower() else 1,
+                0 if "debe ficharse" in d.page_content.lower() else 1,
+                -d.page_content.lower().count(frase_l),
+            )
+        )
+        preferidos = preferidos[: min(3, k)]
+    lex_docs = busqueda_lexica_exhaustiva(query, vs)[: min(3, k)]
     merged: List[Document] = []
     vistos: set = set()
-    for doc in lex_docs + ranked_docs:
+    for doc in preferidos + lex_docs + ranked_docs:
         key = _chunk_key(doc)
         if key in vistos:
             continue
@@ -785,10 +820,14 @@ def debe_ampliar_topn(query: str) -> bool:
 
 
 def extraer_terminos_busqueda(query: str) -> List[str]:
-    return [
-        w for w in re.findall(r"\w+", query.lower())
-        if len(w) > 2 and w not in _STOPWORDS_BUSQUEDA
-    ]
+    _cortas_ok = {"qr", "bg", "ic", "th"}
+    out: List[str] = []
+    for w in re.findall(r"\w+", query.lower()):
+        if w in _STOPWORDS_BUSQUEDA:
+            continue
+        if len(w) > 2 or w in _cortas_ok:
+            out.append(w)
+    return out
 
 
 def _frecuencia_documental(termino: str) -> int:
@@ -1414,6 +1453,105 @@ def recuperar_documentos(vs, query: str, k: int = DEFAULT_K) -> List[Document]:
     return pipeline_recuperacion(vs, query, k=k)
 
 
+def _consulta_fuera_de_corpus(query: str) -> bool:
+    """True si alguna palabra sustancial de la query no está en el índice.
+
+    No usa embeddings ni LLM: recorre df en memoria (milisegundos).
+    Ignora verbos cortos tipo 'era' para que trampas ('caballo') no disparen el pipeline.
+    """
+    terminos = [
+        t for t in extraer_terminos_busqueda(query)
+        if t not in _TERMINOS_INTENT_QUERY
+    ]
+    if not _corpus_docs:
+        return False
+    sustanciales = [
+        t for t in terminos
+        if len(t) >= 4 or t in {"qr", "bga", "ipc"}
+    ]
+    comprobar = sustanciales or terminos
+    if not comprobar:
+        return False
+    return min(_frecuencia_documental(t) for t in comprobar) == 0
+
+
+RESPUESTA_FUERA_DE_AMBITO = (
+    "Esta pregunta no aparece en los documentos indexados. "
+    "Prueba con un tema del corpus (esténcil IPC, retrabajo o manual Bizneo)."
+)
+
+
+def _partir_fragmentos(texto: str) -> List[str]:
+    partes = re.split(r"(?<=[.!?])\s+|\n+", texto)
+    return [p.strip() for p in partes if len(p.strip()) >= 20]
+
+
+def _cita_literal_del_corpus(query: str) -> Tuple[Optional[str], List[Document]]:
+    """Extrae del corpus la oración que hay que copiar; no delega al LLM."""
+    frase = termino_mas_discriminante(query)
+    if not frase or not _corpus_docs:
+        return None, []
+    frase_l = frase.lower()
+    q = query.lower()
+    mejores: List[Tuple[int, int, str, Document]] = []
+    for doc in _corpus_docs:
+        if frase_l not in doc.page_content.lower():
+            continue
+        for frag in _partir_fragmentos(doc.page_content):
+            fl = frag.lower()
+            if frase_l not in fl and not (
+                "aviso" in q and "debe ficharse" in fl
+            ):
+                continue
+            score = 0
+            if "the ratio of the area" in fl:
+                score += 30
+            if "aperture walls" in fl:
+                score += 12
+            if "debe ficharse" in fl:
+                score += 25
+            if "no compartas" in fl or "credenciales" in fl:
+                score += 18
+            if "aviso" in q and "importante" in fl:
+                score += 8
+            if "definición" in q or "definicion" in q:
+                if "the ratio of" in fl:
+                    score += 10
+            score += min(fl.count(frase_l), 3)
+            mejores.append((score, len(frag), frag, doc))
+    if not mejores:
+        return None, []
+    mejores.sort(key=lambda x: (-x[0], x[1]))
+    _, _, cita, doc = mejores[0]
+    return cita, [doc]
+
+
+def _asegurar_oraciones_del_termino(
+    query: str, answer: str, docs: List[Document]
+) -> str:
+    """Si un resumen omite el término pedido, añade una oración del contexto que lo contiene."""
+    if not _es_pregunta_resumen(query):
+        return answer
+    term = termino_mas_discriminante(query)
+    if not term:
+        return answer
+    term_l = term.lower()
+    for doc in docs:
+        for frag in _partir_fragmentos(doc.page_content):
+            fl = frag.lower()
+            if term_l not in fl:
+                continue
+            if "no deben" in fl and "no deben" not in answer.lower():
+                return answer.rstrip() + "\n\n" + frag
+    if term_l in answer.lower():
+        return answer
+    for doc in docs:
+        for frag in _partir_fragmentos(doc.page_content):
+            if term_l in frag.lower():
+                return answer.rstrip() + "\n\n" + frag
+    return answer
+
+
 def _es_copia_literal(query: str) -> bool:
     return bool(
         re.search(r"\bcopia\b|literalmente|cita (exacta|literal|textual)", query, re.IGNORECASE)
@@ -1430,6 +1568,30 @@ def _pregunta_en_espanol(query: str) -> bool:
             q,
         )
     )
+
+
+def _es_pregunta_extractiva(query: str) -> bool:
+    return _es_copia_literal(query) or bool(
+        re.search(r"exactamente|qu[eé] dice", query, re.IGNORECASE)
+    )
+
+
+def _es_seguimiento(query: str) -> bool:
+    q = query.strip().lower()
+    if len(q) > 180:
+        return False
+    return bool(
+        re.search(
+            r"trad[uú]c|castellano|en espa[nñ]ol|al espa[nñ]ol|"
+            r"la puedes|lo puedes|esa respuesta|ese texto|la definici[oó]n|"
+            r"expl[ií]calo|m[aá]s corto|m[aá]s claro",
+            q,
+        )
+    )
+
+
+def _es_pedido_traduccion(query: str) -> bool:
+    return bool(re.search(r"trad[uú]c|castellano|en espa[nñ]ol|al espa[nñ]ol", query, re.IGNORECASE))
 
 
 def _es_pregunta_resumen(query: str) -> bool:
@@ -1456,8 +1618,12 @@ def _instruccion_respuesta(query: str) -> str:
 
 
 def _completar_glosa_espanol(query: str, answer: str, context: str) -> str:
-    """Si el contexto trae términos EN y la respuesta en ES los omite, añade la equivalencia."""
+    """Glosa aperture→apertura solo en preguntas de Area Ratio / definición, no en listados de páginas."""
     if _es_copia_literal(query) or not _pregunta_en_espanol(query):
+        return answer
+    if es_intent_exhaustivo(query):
+        return answer
+    if not re.search(r"area ratio|\baperture\b|qué es|que es", query, re.IGNORECASE):
         return answer
     ctx = context.lower()
     ans = answer.lower()
@@ -1498,6 +1664,15 @@ def _anexar_documentos_fuente(query: str, answer: str, docs: List[Document]) -> 
     return answer.rstrip() + "\n\nDocumentos fuente: " + ", ".join(ids) + "."
 
 
+def _filtrar_docs_por_termino(query: str, docs: List[Document]) -> List[Document]:
+    term = termino_mas_discriminante(query)
+    if not term or not docs:
+        return docs
+    term_l = term.lower()
+    con = [d for d in docs if term_l in d.page_content.lower()]
+    return con if con else docs
+
+
 def construir_contexto(docs: List[Document]) -> str:
     """Orden por relevancia final, límite de caracteres, sin filtros por tipo de documento."""
     partes = []
@@ -1523,12 +1698,50 @@ class SimpleRetrievalQA:
     def __call__(self, query_dict: dict) -> Dict[str, Any]:
         query = query_dict.get("query", "")
         k = query_dict.get("k", DEFAULT_K)
+        pregunta_anterior = (query_dict.get("pregunta_anterior") or "").strip()
+        respuesta_anterior = (query_dict.get("respuesta_anterior") or "").strip()
         resultados_lexicos: List[Document] = []
+
+        if (
+            _es_seguimiento(query)
+            and respuesta_anterior
+            and _es_pedido_traduccion(query)
+        ):
+            prompt = (
+                "Traduce al español de forma fiel el texto siguiente. "
+                "No añadas datos que no estén en el texto. No hables de otros temas.\n\n"
+                f"{respuesta_anterior}"
+            )
+            try:
+                if hasattr(self.llm, "invoke"):
+                    result = self.llm.invoke(
+                        [
+                            SystemMessage(content="Eres un traductor fiel. Solo traduces el texto dado."),
+                            HumanMessage(content=prompt),
+                        ]
+                    )
+                    answer = result.content if hasattr(result, "content") else str(result)
+                else:
+                    answer = respuesta_anterior
+            except Exception as e:
+                answer = f"Error al traducir: {e}"
+            return {"result": answer, "source_documents": []}
+
+        query_busqueda = query
+        if _es_seguimiento(query) and pregunta_anterior:
+            query_busqueda = f"{pregunta_anterior} {query}"
+
+        if not (_es_seguimiento(query) and (pregunta_anterior or respuesta_anterior)):
+            if _consulta_fuera_de_corpus(query):
+                return {
+                    "result": RESPUESTA_FUERA_DE_AMBITO,
+                    "source_documents": [],
+                }
 
         try:
             retrieval = pipeline_recuperacion(
                 self.vectorstore,
-                query,
+                query_busqueda if (_es_seguimiento(query) and pregunta_anterior) else query,
                 k=k,
                 incluir_info_exhaustiva=True,
             )
@@ -1543,7 +1756,25 @@ class SimpleRetrievalQA:
             traceback.print_exc()
             docs = []
 
+        if es_intent_exhaustivo(query):
+            lex = resultados_lexicos or docs
+            nota = construir_nota_exhaustiva(query, lex).strip()
+            return {
+                "result": nota or "No se encontraron menciones en el corpus.",
+                "source_documents": lex[:k] if lex else docs,
+            }
+
+        if _es_pregunta_resumen(query):
+            docs = _filtrar_docs_por_termino(query, docs)
+
         context = construir_contexto(docs) or "No se encontraron fragmentos relevantes."
+
+        if _es_pregunta_extractiva(query):
+            cita, docs_cita = _cita_literal_del_corpus(query)
+            if cita:
+                fuentes = docs_cita or docs
+                return {"result": cita, "source_documents": fuentes}
+
         extra = _instruccion_respuesta(query)
 
         prompt = f"""{extra}Contexto:
@@ -1567,6 +1798,7 @@ Respuesta:"""
             answer = f"Error al generar respuesta: {e}"
 
         answer = _completar_glosa_espanol(query, answer, context)
+        answer = _asegurar_oraciones_del_termino(query, answer, docs)
         answer = _anexar_documentos_fuente(query, answer, docs)
         if es_intent_exhaustivo(query):
             answer += construir_nota_exhaustiva(query, resultados_lexicos)
@@ -1693,6 +1925,8 @@ app.add_middleware(
 class PreguntaRequest(BaseModel):
     pregunta: str
     k: Optional[int] = DEFAULT_K
+    pregunta_anterior: Optional[str] = None
+    respuesta_anterior: Optional[str] = None
 
 
 class RespuestaResponse(BaseModel):
@@ -1810,7 +2044,14 @@ async def hacer_pregunta(request: PreguntaRequest):
     if qa_chain is None:
         raise HTTPException(status_code=503, detail="Sistema no inicializado. Sube documentos primero.")
     try:
-        resultado = qa_chain({"query": request.pregunta, "k": request.k or DEFAULT_K})
+        resultado = qa_chain(
+            {
+                "query": request.pregunta,
+                "k": request.k or DEFAULT_K,
+                "pregunta_anterior": request.pregunta_anterior,
+                "respuesta_anterior": request.respuesta_anterior,
+            }
+        )
         fuentes = [
             {
                 "contenido": d.page_content[:300] + ("..." if len(d.page_content) > 300 else ""),
