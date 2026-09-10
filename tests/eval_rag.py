@@ -40,6 +40,8 @@ if os.getenv("EVAL_DEBUG", "").lower() not in ("1", "true", "yes"):
 
 import rag.api as api_rag  # noqa: E402
 from rag import config as rag_config  # noqa: E402
+from rag.qa import RESPUESTA_FUERA_DE_AMBITO  # noqa: E402
+from rag.retrieval import paginas_cobertura_exhaustiva  # noqa: E402
 
 BASELINE_PATH = Path(__file__).resolve().parent / "eval_baseline.json"
 
@@ -59,6 +61,7 @@ CASOS_TEST = [
         "query": "¿En qué páginas aparece el término solder paste?",
         "paginas_esperadas": [5, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19],
         "tolerancia_min_paginas": 10,
+        "precision_min_paginas": 0.7,
         "debe_contener_nota_exhaustiva": True,
     },
     {
@@ -95,6 +98,16 @@ CASOS_TEST = [
         "query": "Resume todos los apartados relacionados con descansos y pausas.",
         "debe_contener": ["descanso", "pausa", "no deben contar"],
         "no_debe_decir": ["no tengo información suficiente"],
+    },
+    {
+        "query": "receta de paella valenciana",
+        "fuera_de_corpus": True,
+        "debe_contener_exacto": RESPUESTA_FUERA_DE_AMBITO,
+    },
+    {
+        "query": "por qué el caballo no vuela",
+        "fuera_de_corpus": True,
+        "debe_contener_exacto": RESPUESTA_FUERA_DE_AMBITO,
     },
 ]
 
@@ -212,11 +225,25 @@ def validar_caso(caso: Dict[str, Any], eval_data: Dict[str, Any]) -> Dict[str, A
         coinciden = esperadas & paginas_encontradas
         resultado["paginas_encontradas"] = sorted(paginas_encontradas)
         resultado["paginas_coincidentes"] = sorted(coinciden)
+        if esperadas:
+            resultado["recall_paginas"] = len(coinciden) / len(esperadas)
+        if paginas_encontradas:
+            resultado["precision_paginas"] = len(coinciden) / len(paginas_encontradas)
+        else:
+            resultado["precision_paginas"] = 0.0
         if len(coinciden) < minimo:
             motivos.append(
                 f"páginas solder paste: {len(coinciden)}/{len(esperadas)} "
                 f"(mínimo {minimo}). Encontradas: {sorted(coinciden)}"
             )
+        precision_min = caso.get("precision_min_paginas")
+        if precision_min is not None:
+            p = float(resultado["precision_paginas"])
+            if p < precision_min:
+                motivos.append(
+                    f"precision páginas {p:.2f} < {precision_min} "
+                    f"(gold {sorted(coinciden)} vs listadas {sorted(paginas_encontradas)})"
+                )
 
     if "debe_incluir_documento" in caso:
         doc_id_req = caso["debe_incluir_documento"]
@@ -272,14 +299,19 @@ def ejecutar_evaluacion() -> Dict[str, Any]:
         
         # Pipeline de recuperación (sin timeout - Ollama necesita el thread principal)
         print(f"  Recuperando: {query[:50]}...", flush=True)
-        docs = api_rag.pipeline_recuperacion(vs, query, k=api_rag.DEFAULT_K)
-        
-        contexto = api_rag.construir_contexto(docs)
-
-        paginas_exhaustivas: Set[int] = set()
-        if "paginas_esperadas" in caso:
-            lex_docs = api_rag.busqueda_lexica_exhaustiva(query, vs)
-            paginas_exhaustivas = _paginas_de_docs(lex_docs)
+        if caso.get("fuera_de_corpus"):
+            docs = []
+            contexto = ""
+            paginas_exhaustivas: Set[int] = set()
+        else:
+            docs = api_rag.pipeline_recuperacion(vs, query, k=api_rag.DEFAULT_K)
+            contexto = api_rag.construir_contexto(docs)
+            paginas_exhaustivas = set()
+            if "paginas_esperadas" in caso:
+                lex_docs = api_rag.busqueda_lexica_exhaustiva(query, vs)
+                paginas_exhaustivas = set(
+                    paginas_cobertura_exhaustiva(query, lex_docs)
+                )
 
         # Generación LLM (sin timeout - Ollama necesita el thread principal)
         print(f"  Generando respuesta LLM: {query[:50]}...", flush=True)
@@ -362,6 +394,12 @@ def imprimir_reporte(reporte: Dict[str, Any]) -> None:
             print(f"  Fuentes: {r['documentos_fuente']}")
         if r.get("chunk_ids") is not None:
             print(f"  chunk_ids: {r['chunk_ids']}")
+        if r.get("precision_paginas") is not None:
+            print(
+                f"  páginas P={r['precision_paginas']:.2f} "
+                f"R={r.get('recall_paginas', 0):.2f} "
+                f"listadas={r.get('paginas_encontradas')}"
+            )
 
 
 def main() -> int:

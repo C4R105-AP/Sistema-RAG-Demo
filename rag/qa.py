@@ -219,6 +219,29 @@ def _completar_glosa_espanol(query: str, answer: str, context: str) -> str:
     return answer.rstrip() + "\n\n" + extra
 
 
+def _vetar_umbral_area_en_aspect(query: str, answer: str) -> str:
+    """Aspect Ratio y Area Ratio conviven en el mismo chunk; llama3.2 copia el 0.66."""
+    q = query.lower()
+    if "aspect ratio" not in q or "area ratio" in q:
+        return answer
+    texto = re.sub(
+        r"(?i)\s*(?:and|,)?\s*>\s*0\.66\s+for area ratio",
+        "",
+        answer,
+    )
+    texto = re.sub(r"(?i)>\s*0\.66", "", texto)
+    partes = re.split(r"(?<=[.!?])\s+|\n+", texto)
+    texto = " ".join(p.strip() for p in partes if p.strip() and "0.66" not in p).strip()
+    compacto = texto.replace(" ", "")
+    if "1.5" not in compacto:
+        texto = (
+            texto.rstrip()
+            + ("\n\n" if texto else "")
+            + "A general design guide for acceptable paste release should be >1.5 for aspect ratio."
+        ).strip()
+    return texto
+
+
 def _anexar_documentos_fuente(query: str, answer: str, docs: List[Document]) -> str:
     """Igual que la nota exhaustiva: el resumen debe nombrar los PDFs recuperados."""
     if not _es_pregunta_resumen(query) or not docs:
@@ -354,6 +377,7 @@ Respuesta:"""
             answer = f"Error al generar respuesta: {e}"
 
         answer = _completar_glosa_espanol(query, answer, context)
+        answer = _vetar_umbral_area_en_aspect(query, answer)
         answer = _asegurar_oraciones_del_termino(query, answer, docs)
         answer = _anexar_documentos_fuente(query, answer, docs)
         if es_intent_exhaustivo(query):

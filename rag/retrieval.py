@@ -733,14 +733,11 @@ def _diag_chunk_glosario_area_ratio(
         )
 
 
-def construir_nota_exhaustiva(term: str, resultados_lexicos: list) -> str:
-    """
-    Construye la nota de cobertura exhaustiva a partir de los resultados léxicos.
-    Solo se llama cuando EXHAUSTIVE_PATTERNS hace match.
-    """
+def paginas_cobertura_exhaustiva(query: str, resultados_lexicos: list) -> List[int]:
+    """Páginas de la nota 📄 (AND de términos de tema, no de la pregunta)."""
     terminos = [
-        t for t in extraer_terminos_busqueda(term)
-        if t not in PALABRAS_INTENT_EXHAUSTIVO
+        t for t in extraer_terminos_busqueda(query)
+        if t not in PALABRAS_INTENT_EXHAUSTIVO and t not in TERMINOS_INTENT_QUERY
     ]
     paginas = set()
     for doc in resultados_lexicos:
@@ -754,9 +751,15 @@ def construir_nota_exhaustiva(term: str, resultados_lexicos: list) -> str:
         if pagina_visible == 6:
             continue
         paginas.add(pagina_visible)
+    return sorted(paginas)
 
-    paginas = sorted(paginas)
 
+def construir_nota_exhaustiva(term: str, resultados_lexicos: list) -> str:
+    """
+    Construye la nota de cobertura exhaustiva a partir de los resultados léxicos.
+    Solo se llama cuando EXHAUSTIVE_PATTERNS hace match.
+    """
+    paginas = paginas_cobertura_exhaustiva(term, resultados_lexicos)
     if not paginas:
         return ""
 

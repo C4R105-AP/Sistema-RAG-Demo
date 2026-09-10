@@ -106,7 +106,7 @@ Intents especiales:
 
 ## Evaluación
 
-Única puerta: `eval_rag.py` (10 casos; requiere Ollama).
+Única puerta: `eval_rag.py` (12 casos; requiere Ollama). Incluye 2 preguntas fuera de corpus y precisión de páginas en solder paste.
 
 ```powershell
 .\venv\Scripts\python.exe tests\eval_rag.py

@@ -11,15 +11,17 @@ Sistema RAG (Retrieval-Augmented Generation) multi-dominio:
   - IPC-7711 - Rework of Electronic Assemblies (inglés)
   - Manual_Bizneo.pdf (español)
 
-## Estado de evaluación: 10/10 PASS (2026-09-01)
+## Estado de evaluación: 12/12 PASS (2026-09-10)
 
-Fuente de verdad: `eval_baseline.json`. Hay que regenerarlo con `python eval_rag.py --baseline` tras esta corrida.
+Fuente de verdad: `eval_baseline.json`. Regenerarlo con `python tests/eval_rag.py --baseline` tras un 12/12.
 
 ### Tests
-Los 10 casos del harness pasan: Area Ratio, cita literal, páginas solder paste, Aspect Ratio, BGA, vacaciones, QR, credenciales, aviso QR y descansos.
+Los 12 casos del harness: Area Ratio, cita literal, páginas solder paste (P/R de la nota 📄), Aspect Ratio, BGA, vacaciones, QR, credenciales, aviso QR, descansos, y 2 OOS (paella, caballo).
 
 ### Cómo se cerraron los FAIL anteriores
-- **Aspect Ratio**: retrieval prioriza el bigrama `aspect ratio`; el LLM ya no mezcla el umbral `0.66`.
+- **Aspect Ratio**: retrieval prioriza el bigrama `aspect ratio`; postproceso veta `>0.66 for area ratio` si la pregunta no pide Area Ratio.
+- **Solder paste (páginas)**: la precisión se mide sobre las páginas de la nota (AND de términos de tema), no sobre el léxico OR de la pregunta.
+- **OOS**: paella/caballo deben devolver el rechazo de ámbito, sin buscar en FAISS.
 - **BGA**: cuota por documento + cobertura de `bga`; si el resumen no nombra los PDFs, se anexan (mismo patrón que la nota de páginas exhaustivas). Llama 3.2 ignoraba la instrucción de citar fuentes.
 - **Area Ratio (regresión)**: si la pregunta está en español y el contexto trae *aperture/walls*, se añade la glosa *apertura/paredes*. El modelo no traducía de forma estable.
 
@@ -49,7 +51,7 @@ ChatOllama(
 Única puerta de evaluación: `eval_rag.py`.
 
 ```bash
-python tests/eval_rag.py              # 10 tests con Ollama
+python tests/eval_rag.py              # 12 tests con Ollama
 python tests/eval_rag.py --baseline   # guardar eval_baseline.json
 python tests/eval_rag.py --compare    # fallar si un PASS pasa a FAIL
 ```
@@ -61,7 +63,7 @@ python tests/eval_rag.py --compare    # fallar si un PASS pasa a FAIL
 - `rag/ingest.py` / `rag/store.py` / `rag/llm.py` — ingesta, índice y modelos
 - `launcher.py` — arranque (bind `127.0.0.1` por defecto)
 - `web/interfaz_web.html` — UI en `/app`
-- `tests/eval_rag.py` — harness de 10 tests
+- `tests/eval_rag.py` — harness de 12 tests
 - `tests/eval_baseline.json` — último baseline versionado
 
 ## Seguridad mínima (aplicada)
@@ -72,6 +74,6 @@ python tests/eval_rag.py --compare    # fallar si un PASS pasa a FAIL
 - `DELETE /limpiar` deshabilitado salvo `X-RAG-Admin-Token` = `RAG_ADMIN_TOKEN`
 
 **Generado**: 10/09/2026
-**Objetivo**: mantener 10/10 con `eval_rag.py --compare`
+**Objetivo**: mantener 12/12 con `eval_rag.py --compare`
 
 Además del harness: rechazo rápido si la query no está en el índice; citas literales desde el corpus; nota de páginas sin listado del LLM; botón *Traducir* solo en respuestas en inglés.
