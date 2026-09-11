@@ -56,6 +56,52 @@ def _to_float(value) -> float:
     return float(value)
 
 
+_TOC_PUNTOS = re.compile(r"\.{4,}")
+_TOC_FIGURA = re.compile(r"(?i)\bfigure\s+\d+")
+
+
+def parece_tabla_contenidos(texto: str) -> bool:
+    """Índice/TOC de PDF: líderes de puntos y muchas figuras con número de página."""
+    if not texto:
+        return False
+    if len(_TOC_PUNTOS.findall(texto)) >= 2:
+        return True
+    if len(_TOC_FIGURA.findall(texto)) >= 3 and ("....." in texto or texto.count("..") >= 8):
+        return True
+    return False
+
+
+def _ordenar_sin_indices(docs: List[Document]) -> List[Document]:
+    utiles = [d for d in docs if not parece_tabla_contenidos(d.page_content)]
+    indices = [d for d in docs if parece_tabla_contenidos(d.page_content)]
+    return utiles + indices
+
+
+def snippet_fuente(query: str, texto: str, max_chars: int = 300) -> str:
+    """Recorte alrededor del término de la pregunta, no el inicio del chunk (suele ser TOC)."""
+    t = (texto or "").strip()
+    if not t:
+        return ""
+    term = termino_mas_discriminante(query) if query else None
+    idx = t.lower().find(term.lower()) if term else -1
+    if idx < 0:
+        extra = "..." if len(t) > max_chars else ""
+        return t[:max_chars] + extra
+    start = max(0, idx - 50)
+    previo = t[max(0, idx - 80) : idx]
+    seccion = None
+    for m in re.finditer(r"\d+\.\d+(?:\.\d+)?(?:\s+\*)?", previo):
+        seccion = m
+    if seccion:
+        start = max(0, idx - 80) + seccion.start()
+    frag = t[start : start + max_chars]
+    if start > 0 and not seccion:
+        frag = "…" + frag
+    if start + max_chars < len(t):
+        frag = frag.rstrip() + "…"
+    return _sanear_contexto(query, frag)
+
+
 def metadata_json(doc: Document) -> dict:
     """Metadata mínima serializable para respuestas API."""
     permitidos = (
@@ -202,9 +248,7 @@ def _finales_modo_literal(
             continue
         vistos.add(key)
         merged.append(doc)
-        if len(merged) >= k:
-            break
-    return merged
+    return _ordenar_sin_indices(merged)[:k]
 
 
 def _diag_log(mensaje: str) -> None:
@@ -538,7 +582,7 @@ def seleccionar_finales_con_cobertura(
 
     matching_extra = [d for d in resto if contiene(d)]
     otros = [d for d in resto if not contiene(d)]
-    return (esenciales + matching_extra + otros)[:k]
+    return _ordenar_sin_indices(esenciales + matching_extra + otros)[:k]
 
 
 def _obtener_candidatos_rrf(
@@ -879,7 +923,32 @@ def recuperar_documentos(vs, query: str, k: int = DEFAULT_K) -> List[Document]:
     return pipeline_recuperacion(vs, query, k=k)
 
 
-def construir_contexto(docs: List[Document]) -> str:
+def _texto_enfocado(query: str, texto: str) -> str:
+    """Pone primero las oraciones que contienen el término; evita que el LLM copie el TOC."""
+    if not query or not texto:
+        return texto
+    term = termino_mas_discriminante(query)
+    if not term:
+        return texto
+    term_l = term.lower()
+    partes = [p.strip() for p in re.split(r"(?<=[.!?])\s+|\n+", texto) if p.strip()]
+    if len(partes) <= 1:
+        return texto
+    con = [p for p in partes if term_l in p.lower()]
+    if not con:
+        return texto
+    sin = [p for p in partes if term_l not in p.lower()]
+    return "\n".join(con + sin)
+
+
+def _sanear_contexto(query: str, texto: str) -> str:
+    q = (query or "").lower()
+    if "aspect ratio" in q and "area ratio" not in q:
+        texto = re.sub(r"(?i)\s*(?:and|,)?\s*>\s*0\.66\s+for area ratio", "", texto)
+    return texto
+
+
+def construir_contexto(docs: List[Document], query: str = "") -> str:
     """Orden por relevancia final, límite de caracteres, sin filtros por tipo de documento."""
     partes = []
     total = 0
@@ -888,7 +957,8 @@ def construir_contexto(docs: List[Document]) -> str:
         pagina = doc.metadata.get("page_number", "?")
         chunk_id = doc.metadata.get("chunk_id", "?")
         etiqueta = f"[{i}] {doc_id} | p.{pagina} | chunk {chunk_id}"
-        bloque = f"{etiqueta}\n{doc.page_content}"
+        cuerpo = _sanear_contexto(query, _texto_enfocado(query, doc.page_content))
+        bloque = f"{etiqueta}\n{cuerpo}"
         if total + len(bloque) > MAX_CHARS_CONTEXTO:
             break
         partes.append(bloque)

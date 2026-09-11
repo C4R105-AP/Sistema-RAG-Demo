@@ -50,6 +50,7 @@ eval_*.log
 eval_*.txt
 eval_output*
 output*.txt
+rag.txt
 rag_answer.txt
 respuesta_*.txt
 resultado_*.txt

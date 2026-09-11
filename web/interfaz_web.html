@@ -624,7 +624,11 @@
         async function traducirRespuesta(pregunta, texto, btn) {
             if (isProcessing || !texto) return;
             isProcessing = true;
-            if (btn) btn.disabled = true;
+            const label = btn ? btn.textContent : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Traduciendo…';
+            }
             const sendBtn = document.getElementById('sendButton');
             sendBtn.disabled = true;
             try {
@@ -647,7 +651,10 @@
             } finally {
                 isProcessing = false;
                 sendBtn.disabled = false;
-                if (btn) btn.disabled = false;
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = label || 'Traducir al castellano';
+                }
             }
         }
 

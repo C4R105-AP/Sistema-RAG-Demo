@@ -36,6 +36,7 @@ from .retrieval import (
     construir_contexto,
     metadata_json,
     pipeline_recuperacion,
+    snippet_fuente,
 )
 from .store import (
     cargar_vectorstore_global,
@@ -221,7 +222,7 @@ async def hacer_pregunta(request: PreguntaRequest):
         )
         fuentes = [
             {
-                "contenido": d.page_content[:300] + ("..." if len(d.page_content) > 300 else ""),
+                "contenido": snippet_fuente(request.pregunta, d.page_content),
                 "metadata": metadata_json(d),
             }
             for d in resultado["source_documents"]

@@ -23,6 +23,16 @@ CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "200"))
 
 DEFAULT_K = int(os.getenv("DEFAULT_K", "8"))
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0"))
+# Traductor: google (rápido, online) | deepl (clave) | marian (local) | ollama
+TRANSLATE_BACKEND = (os.getenv("TRANSLATE_BACKEND") or "google").strip().lower()
+TRANSLATE_MODEL = (
+    os.getenv("TRANSLATE_MODEL") or "Helsinki-NLP/opus-mt-en-es"
+).strip()
+TRANSLATE_NUM_PREDICT_MAX = int(os.getenv("TRANSLATE_NUM_PREDICT_MAX", "160"))
+DEEPL_API_KEY = (os.getenv("DEEPL_API_KEY") or "").strip()
+DEEPL_API_URL = (
+    os.getenv("DEEPL_API_URL") or "https://api-free.deepl.com"
+).rstrip("/")
 RETRIEVAL_MULTIPLIER = int(os.getenv("RETRIEVAL_MULTIPLIER", "4"))
 CORPUS_SMALL_THRESHOLD = int(os.getenv("CORPUS_SMALL_THRESHOLD", "200"))
 RRF_K = int(os.getenv("RRF_K", "60"))

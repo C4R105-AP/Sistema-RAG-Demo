@@ -8,5 +8,6 @@ from langchain_core.documents import Document
 vectorstore = None
 qa_chain = None
 reranker = None
+traductor = None
 corpus_docs: List[Document] = []
 bm25_index = None
