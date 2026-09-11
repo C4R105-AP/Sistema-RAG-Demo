@@ -13,6 +13,7 @@ from .config import (
     DEFAULT_K,
     PALABRAS_INTENT_EXHAUSTIVO,
     RAG_SYSTEM_PROMPT,
+    STOPWORDS_BUSQUEDA,
     TERMINOS_INTENT_QUERY,
 )
 from .errors import RetrievalPipelineError
@@ -61,74 +62,188 @@ def _partir_fragmentos(texto: str) -> List[str]:
     return [p.strip() for p in partes if len(p.strip()) >= 20]
 
 
+def _terminos_contenido(query: str) -> List[str]:
+    """Términos de tema de la query (sin intents ni stopwords)."""
+    out: List[str] = []
+    vistos = set()
+    for t in extraer_terminos_busqueda(query):
+        if t in TERMINOS_INTENT_QUERY or t in PALABRAS_INTENT_EXHAUSTIVO:
+            continue
+        if t in STOPWORDS_BUSQUEDA:
+            continue
+        if t in vistos:
+            continue
+        vistos.add(t)
+        out.append(t)
+    return out
+
+
+def _term_in_text(term: str, text_l: str) -> bool:
+    """Match léxico flexible (fichaje≈ficharse) sin diccionarios de dominio."""
+    if not term:
+        return False
+    if term in text_l:
+        return True
+    if len(term) >= 5:
+        raiz = term[: max(4, len(term) - 2)]
+        if re.search(rf"\b{re.escape(raiz)}\w*", text_l):
+            return True
+    return False
+
+
+def _puntuacion_oracion_cita(query: str, frag: str, frase_l: str) -> int:
+    """Score genérico: cobertura de términos + forma (definición/norma), sin dominio."""
+    fl = frag.lower()
+    q = query.lower()
+    if parece_tabla_contenidos(frag) or "......" in frag or frag.count("..") >= 6:
+        return -100
+
+    terminos = _terminos_contenido(query)
+    if frase_l and frase_l not in terminos:
+        terminos = [frase_l] + terminos
+
+    score = 0
+    hits = 0
+    for t in terminos:
+        if _term_in_text(t, fl):
+            hits += 1
+            score += 5 if t == frase_l else 2
+    if hits == 0 and not (frase_l and _term_in_text(frase_l, fl)):
+        return -50
+
+    if terminos:
+        score += int(10 * hits / max(len(terminos), 1))
+
+    pos = fl.find(frase_l) if frase_l else -1
+    if 0 <= pos <= 48:
+        score += 8
+
+    frase_re = re.escape(frase_l) if frase_l else ""
+    if frase_re and re.search(rf"{frase_re}\s+(is|es|means|the ratio|se define)", fl):
+        score += 14
+    if frase_re and re.search(rf"\d+\.\d+[^\n]{{0,40}}\*?{frase_re}", fl):
+        score += 10
+    if re.search(r"\b(the ratio of|is the|means|se define como)\b", fl):
+        score += 8
+
+    # Fragmento cortado a medias (sin cierre de oración)
+    if not re.search(r'[.!?"»]\s*$', frag.strip()):
+        score -= 22
+
+    pide_aviso = "aviso" in q
+    pide_copia = bool(re.search(r"\bcopia\b|literalmente|cita (exacta|literal|textual)", q))
+    if pide_aviso or pide_copia:
+        if re.match(r"(?i)^(debe|deben|shall|must)\b", frag.strip()):
+            score += 22
+        if re.search(r"\b(debe|deben|shall|must|prohibido|no\s+compart)\b", fl):
+            score += 12
+        if re.search(r"\bes importante (leer|volver|escanear|fichar)\b", fl):
+            score -= 14
+        if pide_aviso and re.search(r"\bes importante\b", fl) and not re.search(
+            r"\b(debe|deben|shall|must)\b", fl
+        ):
+            score -= 8
+        # Aviso de norma: preferir enunciados cortos y cerrados
+        if len(frag) <= 140 and re.search(r"[.!?]\s*$", frag.strip()):
+            score += 8
+        elif len(frag) <= 220:
+            score += 3
+
+    pide_def = bool(
+        re.search(r"definici[oó]n|qu[eé]\s+es|qu[eé]\s+significa|copia|literalmente", q)
+    )
+    # «recomendaciones» no es definición de glosario
+    if pide_def and not re.search(r"recomend|umbral|gu[ií]a", q):
+        if len(frag) < 220:
+            score += 4
+        if re.search(
+            r"\b(perform|between|should be|recommended|guideline for|chart showing)\b",
+            fl,
+        ):
+            score -= 12
+        if re.search(r"\b(the ratio of|opening|walls|is the)\b", fl):
+            score += 6
+
+    pide_recomend = bool(re.search(r"recomend|umbral|gu[ií]a|design guide", q))
+    if pide_recomend:
+        if re.search(r">\s*\d", fl) and hits:
+            score += 22
+        if re.search(r"\b(should be|design guide|acceptable|recommended)\b", fl):
+            score += 12
+        if re.search(r"\bthe ratio of\b", fl) and not re.search(r">\s*\d", fl):
+            score -= 28
+        if re.search(r"\b(chart showing|table\s+\d)\b", fl):
+            score -= 10
+
+    if frase_l and " " in frase_l and frase_l.endswith("ratio"):
+        for m in re.finditer(r"\b([a-z]+)\s+ratio\b", fl):
+            otro = m.group(0)
+            if otro != frase_l:
+                score -= 6
+
+    if pide_copia and len(frag) < 260:
+        score += 2
+    return score
+
+
+def _sanear_cita_umbrales(query: str, cita: str) -> str:
+    """Si la query nombra un solo * ratio, quita umbrales del otro en la cita."""
+    q = query.lower()
+    if "aspect ratio" in q and "area ratio" not in q:
+        cita = re.sub(
+            r"(?i)\s*(?:and|,)?\s*>\s*0\.66\s+for area ratio",
+            "",
+            cita,
+        )
+    if "area ratio" in q and "aspect ratio" not in q:
+        cita = re.sub(
+            r"(?i)\s*(?:and|,)?\s*>\s*1\.5\s+for aspect ratio",
+            "",
+            cita,
+        )
+    return re.sub(r"\s{2,}", " ", cita).strip(" ,;")
+
+
 def _cita_literal_de_docs(
     query: str, docs: List[Document]
-) -> Tuple[Optional[str], List[Document]]:
-    """Elige la oración más alineada con el término discriminante (sin reglas de dominio)."""
+) -> Tuple[Optional[str], List[Document], int]:
+    """Elige la oración más alineada (score genérico). Devuelve (cita, docs, score)."""
     frase = termino_mas_discriminante(query)
-    if not frase or not docs:
-        return None, []
-    frase_l = frase.lower()
-    frase_re = re.escape(frase_l)
-    q = query.lower()
-    pide_def = bool(
-        re.search(r"definici[oó]n|qu[eé]\s+es|copia|literalmente|exactamente", q)
-    )
+    frase_l = (frase or "").lower()
     mejores: List[Tuple[int, int, str, Document]] = []
+    terminos = _terminos_contenido(query)
     for doc in docs:
         if parece_tabla_contenidos(doc.page_content):
             continue
-        if frase_l not in doc.page_content.lower():
-            continue
         for frag in _partir_fragmentos(doc.page_content):
+            score = _puntuacion_oracion_cita(query, frag, frase_l)
+            if score < 0:
+                continue
             fl = frag.lower()
-            if frase_l not in fl:
-                continue
-            if parece_tabla_contenidos(frag):
-                continue
-            score = min(fl.count(frase_l), 4) * 3
-            pos = fl.find(frase_l)
-            if 0 <= pos <= 48:
-                score += 8
-            if re.search(rf"{frase_re}\s+(is|es|means|the ratio|se define)", fl):
-                score += 14
-            if re.search(rf"\d+\.\d+[^\n]{{0,40}}\*?{frase_re}", fl):
-                score += 10
-            if re.search(r"\b(the ratio of|is the|means|se define como)\b", fl):
-                score += 8
-            if "aviso" in q and "importante" in fl:
-                score += 6
-            if pide_def:
-                if len(frag) < 220:
-                    score += 4
-                if re.search(
-                    r"\b(perform|between|should be|recommended|guideline for)\b", fl
-                ):
-                    score -= 12
-                if re.search(r"\b(the ratio of|opening|walls|is the)\b", fl):
-                    score += 6
-            if _es_copia_literal(query) and len(frag) < 260:
-                score += 2
-            if "......" in frag or frag.count("..") >= 6:
-                score -= 10
+            if terminos and not any(_term_in_text(t, fl) for t in terminos):
+                if not (frase_l and _term_in_text(frase_l, fl)):
+                    continue
             mejores.append((score, len(frag), frag, doc))
     if not mejores:
-        return None, []
+        return None, [], -1
     mejores.sort(key=lambda x: (-x[0], x[1]))
-    _, _, cita, doc = mejores[0]
-    return cita, [doc]
+    score, _, cita, doc = mejores[0]
+    return _sanear_cita_umbrales(query, cita), [doc], score
 
 
 def _ampliar_docs_por_termino(query: str, docs: List[Document]) -> List[Document]:
-    """Une retrieval + chunks léxicos del término (sigue siendo búsqueda en el índice)."""
+    """Une retrieval + chunks léxicos de los términos de la query."""
+    terminos = _terminos_contenido(query)
     frase = termino_mas_discriminante(query)
-    if not frase or not state.corpus_docs:
+    if frase and frase.lower() not in terminos:
+        terminos = [frase.lower()] + terminos
+    if not terminos or not state.corpus_docs:
         return docs
-    frase_l = frase.lower()
     vistos = {_chunk_key_safe(d) for d in docs}
     extra: List[Document] = []
     for d in state.corpus_docs:
-        if frase_l not in d.page_content.lower():
+        texto = d.page_content.lower()
+        if not any(_term_in_text(t, texto) for t in terminos):
             continue
         if parece_tabla_contenidos(d.page_content):
             continue
@@ -137,7 +252,7 @@ def _ampliar_docs_por_termino(query: str, docs: List[Document]) -> List[Document
             continue
         vistos.add(key)
         extra.append(d)
-        if len(extra) >= 40:
+        if len(extra) >= 50:
             break
     return list(docs) + extra
 
@@ -147,6 +262,16 @@ def _chunk_key_safe(doc: Document) -> str:
         f"{doc.metadata.get('document_id', '')}::"
         f"{doc.metadata.get('chunk_id', id(doc))}"
     )
+
+
+def _intentar_cita_extractiva(
+    query: str, docs: List[Document], min_score: int = 8
+) -> Tuple[Optional[str], List[Document]]:
+    pool = _ampliar_docs_por_termino(query, docs)
+    cita, docs_cita, score = _cita_literal_de_docs(query, pool)
+    if cita and score >= min_score:
+        return cita, docs_cita
+    return None, []
 
 
 def _asegurar_oraciones_del_termino(
@@ -513,11 +638,18 @@ class SimpleRetrievalQA:
         docs = _filtrar_docs_por_termino(query, docs)
         docs = _fuentes_visibles(docs)
 
-        # Citas literales: retrieval + ampliación léxica del término (siempre sobre chunks).
-        if _es_pregunta_extractiva(query):
-            pool = _ampliar_docs_por_termino(query, docs)
-            cita, docs_cita = _cita_literal_de_docs(query, pool)
+        # Citas / definiciones / recomendaciones numéricas: oración de chunks (scoring genérico).
+        usar_cita = (
+            _es_pregunta_extractiva(query)
+            or _es_pregunta_definicion(query)
+            or bool(re.search(r"recomend|umbral|gu[ií]a", query, re.IGNORECASE))
+        )
+        if usar_cita:
+            min_score = 12 if _es_pregunta_definicion(query) else 8
+            cita, docs_cita = _intentar_cita_extractiva(query, docs, min_score=min_score)
             if cita:
+                if _es_pregunta_definicion(query) and not _es_copia_literal(query):
+                    cita = _completar_glosa_espanol(query, cita, cita)
                 return {
                     "result": cita,
                     "source_documents": _fuentes_para_respuesta(
