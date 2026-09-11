@@ -1,0 +1,33 @@
+---
+description: Estándares del Sistema RAG — arquitectura, agnosticismo de dominio, seguridad local y puerta de evaluación.
+globs: rag/**/*.py,tests/**/*.py,web/**/*.html,launcher.py,README.md,docs/**/*.md
+alwaysApply: true
+---
+
+# Estándares RAG
+
+## Arquitectura
+- Capas: `rag/api.py` (HTTP), `ingest`, `retrieval`, `qa`, `llm`, `store`, `config`.
+- No meter lógica de pipeline en `api.py` ni reglas de dominio en el LLM system prompt largo.
+- `launcher.py` arranca uvicorn; bind por defecto `127.0.0.1`.
+
+## Agnosticismo
+- **Siempre** `pipeline_recuperacion` antes de responder (salvo traducir un texto ya respondido).
+- Citas literales: scoring por **forma** (término de la query, definición/norma, longitud, TOC). Sin bonus hardcodeados IPC/Bizneo.
+- No añadir glosarios de frases por documento. Postproceso solo genérico (dedupe, prefijos, umbrales cruzados si la query distingue dos términos).
+
+## Retrieval / QA
+- Filtrar TOC en fuentes; snippets centrados en el término; pocas fuentes (~4).
+- Intents: páginas → nota 📄; copia/exactamente → oración de chunks; resumen → filtrar por término + anexar PDFs.
+- Pregunta ES + docs EN: embeddings multilingües; BM25 es léxico — el usuario puede mezclar término técnico en inglés.
+
+## Traducción
+- Backend por `.env`: `TRANSLATE_BACKEND=google|deepl|marian|ollama`. No reintroducir traducciones fijas del corpus.
+
+## Evaluación y git
+- Puerta: `.\venv\Scripts\python.exe tests\eval_rag.py --compare` (Ollama arriba).
+- No versionar `.env`, `rag.txt`, PDFs, `data/vectorstore_faiss/`, secretos.
+- Commits: autor del usuario; no `Co-authored-by: Cursor`.
+
+## Seguridad local
+- Upload con basename; chat con `textContent`; `DELETE /limpiar` solo con admin token.

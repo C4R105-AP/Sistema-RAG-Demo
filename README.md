@@ -199,6 +199,9 @@ El índice FAISS usa deserialización local (pickle): solo índices de confianza
 ├── web/                 # Interfaz estática
 ├── tests/               # eval_rag.py y baseline
 ├── docs/                # Notas para desarrollo
+├── .cursor/
+│   ├── rules/           # Estándares persistentes del agente
+│   └── skills/          # Flujos: eval-gate, feature
 ├── data/                # Runtime (no se versiona índice ni PDF)
 │   ├── uploaded_docs/
 │   └── vectorstore_faiss/

@@ -89,6 +89,9 @@ ollama serve
 - `web/interfaz_web.html` — UI
 - `tests/eval_rag.py` + `tests/eval_baseline.json`
 - `.env.example` — plantilla de configuración
+- `.cursor/rules/rag-standards.mdc` — estándares del agente
+- `.cursor/skills/rag-eval-gate` — harness `--compare` / `--baseline`
+- `.cursor/skills/rag-feature` — cambios de pipeline sin hardcodear dominio
 
 ## Seguridad mínima
 
